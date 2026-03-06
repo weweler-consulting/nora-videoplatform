@@ -17,6 +17,7 @@ export default function AdminUsers() {
   const [enrollingUserId, setEnrollingUserId] = useState<string | null>(null);
   const [inviteResult, setInviteResult] = useState<{ name: string; email: string; password: string; courseTitle: string; emailSent: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [filterCourseId, setFilterCourseId] = useState('');
 
   const load = () => {
     Promise.all([api.getUsers(), api.getAllCourses()])
@@ -110,6 +111,26 @@ export default function AdminUsers() {
         >
           + Nutzer einladen
         </button>
+      </div>
+
+      {/* Course filter */}
+      <div className="flex items-center gap-3 mb-6">
+        <label className="text-sm text-gray-500">Filtern nach Kurs:</label>
+        <select
+          value={filterCourseId}
+          onChange={(e) => setFilterCourseId(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] bg-white"
+        >
+          <option value="">Alle Nutzer</option>
+          {courses.map((c) => (
+            <option key={c.id} value={c.id}>{c.title}</option>
+          ))}
+        </select>
+        {filterCourseId && (
+          <span className="text-sm text-gray-400">
+            {users.filter((u) => !u.is_admin && u.enrollments.some((e) => e.course_id === filterCourseId)).length} Teilnehmer
+          </span>
+        )}
       </div>
 
       {showInvite && (
@@ -232,112 +253,117 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {users.length === 0 ? (
-        <div className="bg-white rounded-2xl p-8 text-center text-gray-500">
-          Noch keine Nutzer vorhanden.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {users.map((user) => (
-            <div key={user.id} className="bg-white rounded-2xl p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-gray-800">{user.name}</h3>
-                    {user.is_admin && (
-                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                        Admin
-                      </span>
-                    )}
-                    {!user.is_admin && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        user.is_active
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        {user.is_active ? 'aktiv' : 'inaktiv'}
-                      </span>
-                    )}
+      {(() => {
+        const filteredUsers = filterCourseId
+          ? users.filter((u) => u.enrollments.some((e) => e.course_id === filterCourseId))
+          : users;
+        return filteredUsers.length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 text-center text-gray-500">
+            {filterCourseId ? 'Keine Nutzer in diesem Kurs.' : 'Noch keine Nutzer vorhanden.'}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filteredUsers.map((user) => (
+              <div key={user.id} className="bg-white rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-800">{user.name}</h3>
+                      {user.is_admin && (
+                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                          Admin
+                        </span>
+                      )}
+                      {!user.is_admin && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          user.is_active
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {user.is_active ? 'aktiv' : 'inaktiv'}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500">{user.email}</p>
                   </div>
-                  <p className="text-sm text-gray-500">{user.email}</p>
+                  {!user.is_admin && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleToggleActive(user.id)}
+                        className={`px-3 py-1.5 text-sm border rounded-lg transition-colors ${
+                          user.is_active
+                            ? 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                            : 'border-green-200 text-green-600 hover:bg-green-50'
+                        }`}
+                      >
+                        {user.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(user.id, user.name)}
+                        className="px-3 py-1.5 text-sm border border-red-200 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        Loschen
+                      </button>
+                    </div>
+                  )}
                 </div>
+
+                {/* Enrollments */}
                 {!user.is_admin && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleToggleActive(user.id)}
-                      className={`px-3 py-1.5 text-sm border rounded-lg transition-colors ${
-                        user.is_active
-                          ? 'border-gray-200 text-gray-500 hover:bg-gray-50'
-                          : 'border-green-200 text-green-600 hover:bg-green-50'
-                      }`}
-                    >
-                      {user.is_active ? 'Deaktivieren' : 'Aktivieren'}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteUser(user.id, user.name)}
-                      className="px-3 py-1.5 text-sm border border-red-200 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
-                    >
-                      Loschen
-                    </button>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {user.enrollments.map((enr) => (
+                      <span
+                        key={enr.enrollment_id}
+                        className="inline-flex items-center gap-1.5 text-sm bg-[var(--nora-pink-light)] text-[var(--nora-pink-dark)] px-3 py-1 rounded-full"
+                      >
+                        {enr.course_title}
+                        <button
+                          onClick={() => handleRemoveEnrollment(enr.enrollment_id, user.name, enr.course_title)}
+                          className="hover:text-red-500 transition-colors"
+                          title="Aus Kurs entfernen"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      </span>
+                    ))}
+                    {enrollingUserId === user.id ? (
+                      <select
+                        autoFocus
+                        className="text-sm border border-gray-200 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] bg-white"
+                        value=""
+                        onChange={(e) => handleEnrollUser(user.id, e.target.value)}
+                        onBlur={() => setEnrollingUserId(null)}
+                      >
+                        <option value="">Kurs wählen...</option>
+                        {courses
+                          .filter((c) => !user.enrollments.some((enr) => enr.course_id === c.id))
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>{c.title}</option>
+                          ))}
+                      </select>
+                    ) : (
+                      <button
+                        onClick={() => setEnrollingUserId(user.id)}
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-dashed border-gray-300 text-gray-400 hover:border-[var(--nora-pink)] hover:text-[var(--nora-pink)] transition-colors"
+                        title="Kurs zuordnen"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
+                        </svg>
+                      </button>
+                    )}
+                    {user.enrollments.length === 0 && enrollingUserId !== user.id && (
+                      <span className="text-xs text-gray-400">Kein Kurs zugewiesen</span>
+                    )}
                   </div>
                 )}
               </div>
-
-              {/* Enrollments */}
-              {!user.is_admin && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {user.enrollments.map((enr) => (
-                    <span
-                      key={enr.enrollment_id}
-                      className="inline-flex items-center gap-1.5 text-sm bg-[var(--nora-pink-light)] text-[var(--nora-pink-dark)] px-3 py-1 rounded-full"
-                    >
-                      {enr.course_title}
-                      <button
-                        onClick={() => handleRemoveEnrollment(enr.enrollment_id, user.name, enr.course_title)}
-                        className="hover:text-red-500 transition-colors"
-                        title="Aus Kurs entfernen"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </span>
-                  ))}
-                  {enrollingUserId === user.id ? (
-                    <select
-                      autoFocus
-                      className="text-sm border border-gray-200 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] bg-white"
-                      value=""
-                      onChange={(e) => handleEnrollUser(user.id, e.target.value)}
-                      onBlur={() => setEnrollingUserId(null)}
-                    >
-                      <option value="">Kurs wählen...</option>
-                      {courses
-                        .filter((c) => !user.enrollments.some((enr) => enr.course_id === c.id))
-                        .map((c) => (
-                          <option key={c.id} value={c.id}>{c.title}</option>
-                        ))}
-                    </select>
-                  ) : (
-                    <button
-                      onClick={() => setEnrollingUserId(user.id)}
-                      className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-dashed border-gray-300 text-gray-400 hover:border-[var(--nora-pink)] hover:text-[var(--nora-pink)] transition-colors"
-                      title="Kurs zuordnen"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
-                      </svg>
-                    </button>
-                  )}
-                  {user.enrollments.length === 0 && enrollingUserId !== user.id && (
-                    <span className="text-xs text-gray-400">Kein Kurs zugewiesen</span>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }
