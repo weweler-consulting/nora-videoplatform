@@ -256,8 +256,7 @@ export default function AdminUsers() {
                             </button>
                           </Badge>
                         ))}
-                        {!user.is_admin && (
-                          enrollingUserId === user.id ? (
+                        {enrollingUserId === user.id ? (
                             <select
                               autoFocus
                               className="h-6 text-xs border border-input rounded px-1 bg-transparent focus:outline-none focus:ring-1 focus:ring-ring"
@@ -279,8 +278,7 @@ export default function AdminUsers() {
                             >
                               <Plus className="h-3 w-3" />
                             </button>
-                          )
-                        )}
+                          )}
                       </div>
                     </TableCell>
                     <TableCell>
