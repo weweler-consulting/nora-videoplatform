@@ -71,6 +71,11 @@ Nora"""
     msg.attach(MIMEText(text, "plain", "utf-8"))
     msg.attach(MIMEText(html, "html", "utf-8"))
 
+    _send_smtp(config, msg)
+    return True
+
+
+def _send_smtp(config: dict, msg: MIMEMultipart):
     with smtplib.SMTP(config["server"], config["port"]) as smtp:
         try:
             smtp.starttls()
@@ -79,4 +84,48 @@ Nora"""
         smtp.login(config["username"], config["password"])
         smtp.send_message(msg)
 
+
+def send_password_reset_email(to_email: str, to_name: str, reset_url: str) -> bool:
+    """Send password reset email. Returns True if sent."""
+    config = get_smtp_config()
+    if not config:
+        return False
+
+    subject = "Passwort zurücksetzen"
+
+    text = f"""Hallo {to_name},
+
+du hast angefordert, dein Passwort zurückzusetzen.
+
+Klicke auf den folgenden Link, um ein neues Passwort zu vergeben:
+
+{reset_url}
+
+Der Link ist 1 Stunde gültig.
+
+Falls du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.
+
+Liebe Grüße
+Nora"""
+
+    html = f"""<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 500px; margin: 0 auto; padding: 32px;">
+  <h2 style="color: #d4768c; font-weight: 300; font-style: italic; margin-bottom: 24px;">Nora Weweler</h2>
+  <p>Hallo {to_name},</p>
+  <p>du hast angefordert, dein Passwort zur&uuml;ckzusetzen.</p>
+  <div style="text-align: center; margin: 32px 0;">
+    <a href="{reset_url}" style="background: #D47479; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 500;">Neues Passwort vergeben</a>
+  </div>
+  <p style="color: #888; font-size: 14px;">Der Link ist 1 Stunde g&uuml;ltig.</p>
+  <p style="color: #888; font-size: 14px;">Falls du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.</p>
+  <p>Liebe Gr&uuml;&szlig;e<br>Nora</p>
+</div>"""
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = config["from_addr"]
+    msg["To"] = to_email
+    msg.attach(MIMEText(text, "plain", "utf-8"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    _send_smtp(config, msg)
     return True

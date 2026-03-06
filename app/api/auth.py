@@ -1,13 +1,19 @@
+import logging
+import secrets
+from datetime import datetime, timedelta
 from typing import Optional
-from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, EmailStr
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.auth import hash_password, verify_password, create_access_token, get_current_user
+from app.core.email import send_password_reset_email
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -54,6 +60,48 @@ async def change_password(data: ChangePasswordRequest, user: User = Depends(get_
     if len(data.new_password) < 6:
         raise HTTPException(status_code=400, detail="Passwort muss mindestens 6 Zeichen haben")
     user.hashed_password = hash_password(data.new_password)
+    return {"ok": True}
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+@router.post("/forgot-password")
+async def forgot_password(data: ForgotPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.email == data.email))
+    user = result.scalar_one_or_none()
+    if not user:
+        # Don't reveal whether user exists
+        return {"ok": True}
+    token = secrets.token_urlsafe(32)
+    user.reset_token = token
+    user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+    base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
+    reset_url = f"{base}/reset-password?token={token}"
+    try:
+        send_password_reset_email(user.email, user.name, reset_url)
+    except Exception as e:
+        logger.error(f"Failed to send password reset email: {e}")
+    return {"ok": True}
+
+
+@router.post("/reset-password")
+async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Passwort muss mindestens 6 Zeichen haben")
+    result = await db.execute(select(User).where(User.reset_token == data.token))
+    user = result.scalar_one_or_none()
+    if not user or not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Link ist ungültig oder abgelaufen")
+    user.hashed_password = hash_password(data.new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
     return {"ok": True}
 
 

@@ -16,11 +16,16 @@ from app.api import auth, courses, modules, sections, lessons, users, progress
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Add is_active column if missing (no Alembic migrations)
-        try:
-            await conn.execute(text("ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT TRUE NOT NULL"))
-        except Exception:
-            pass  # Column already exists
+        # Add columns if missing (no Alembic migrations)
+        for stmt in [
+            "ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT TRUE NOT NULL",
+            "ALTER TABLE users ADD COLUMN reset_token VARCHAR",
+            "ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP",
+        ]:
+            try:
+                await conn.execute(text(stmt))
+            except Exception:
+                pass  # Column already exists
     yield
 
 
