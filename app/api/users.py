@@ -65,6 +65,23 @@ async def invite_user(data: InviteRequest, admin: User = Depends(require_admin),
     return {"user_id": user.id, "enrolled": True}
 
 
+@router.post("/{user_id}/enroll")
+async def enroll_user(user_id: str, data: dict, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    course_id = data.get("course_id")
+    if not course_id:
+        raise HTTPException(status_code=400, detail="course_id required")
+    result = await db.execute(select(User).where(User.id == user_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="User not found")
+    existing = await db.execute(
+        select(Enrollment).where(Enrollment.user_id == user_id, Enrollment.course_id == course_id)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Bereits eingeschrieben")
+    db.add(Enrollment(user_id=user_id, course_id=course_id))
+    return {"ok": True}
+
+
 @router.delete("/enrollment/{enrollment_id}")
 async def remove_enrollment(enrollment_id: str, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Enrollment).where(Enrollment.id == enrollment_id))

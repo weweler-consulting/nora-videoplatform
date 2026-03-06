@@ -13,6 +13,7 @@ export default function AdminUsers() {
   const [invPassword, setInvPassword] = useState('');
   const [invCourseId, setInvCourseId] = useState('');
   const [invError, setInvError] = useState('');
+  const [enrollingUserId, setEnrollingUserId] = useState<string | null>(null);
 
   const load = () => {
     Promise.all([api.getUsers(), api.getAllCourses()])
@@ -44,6 +45,16 @@ export default function AdminUsers() {
       load();
     } catch (err: any) {
       setInvError(err.message || 'Fehler beim Einladen.');
+    }
+  };
+
+  const handleEnrollUser = async (userId: string, courseId: string) => {
+    try {
+      await api.enrollUser(userId, courseId);
+      setEnrollingUserId(null);
+      load();
+    } catch (err: any) {
+      alert(err.message || 'Fehler beim Zuordnen.');
     }
   };
 
@@ -185,8 +196,8 @@ export default function AdminUsers() {
               </div>
 
               {/* Enrollments */}
-              {user.enrollments.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
+              {!user.is_admin && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   {user.enrollments.map((enr) => (
                     <span
                       key={enr.enrollment_id}
@@ -204,10 +215,36 @@ export default function AdminUsers() {
                       </button>
                     </span>
                   ))}
+                  {enrollingUserId === user.id ? (
+                    <select
+                      autoFocus
+                      className="text-sm border border-gray-200 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] bg-white"
+                      value=""
+                      onChange={(e) => handleEnrollUser(user.id, e.target.value)}
+                      onBlur={() => setEnrollingUserId(null)}
+                    >
+                      <option value="">Kurs wählen...</option>
+                      {courses
+                        .filter((c) => !user.enrollments.some((enr) => enr.course_id === c.id))
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>{c.title}</option>
+                        ))}
+                    </select>
+                  ) : (
+                    <button
+                      onClick={() => setEnrollingUserId(user.id)}
+                      className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-dashed border-gray-300 text-gray-400 hover:border-[var(--nora-pink)] hover:text-[var(--nora-pink)] transition-colors"
+                      title="Kurs zuordnen"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
+                      </svg>
+                    </button>
+                  )}
+                  {user.enrollments.length === 0 && enrollingUserId !== user.id && (
+                    <span className="text-xs text-gray-400">Kein Kurs zugewiesen</span>
+                  )}
                 </div>
-              )}
-              {user.enrollments.length === 0 && !user.is_admin && (
-                <p className="mt-2 text-xs text-gray-400">Kein Kurs zugewiesen</p>
               )}
             </div>
           ))}
