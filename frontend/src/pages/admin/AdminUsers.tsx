@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
 import { api, type UserWithEnrollments, type CourseListItem } from '../../lib/api';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Plus, X, UserPlus, Trash2, ShieldCheck, ShieldOff, Copy, Check } from 'lucide-react';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserWithEnrollments[]>([]);
   const [courses, setCourses] = useState<CourseListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
-
-  // Invite form
   const [invEmail, setInvEmail] = useState('');
   const [invName, setInvName] = useState('');
   const [invPassword, setInvPassword] = useState('');
@@ -31,27 +35,20 @@ export default function AdminUsers() {
     e.preventDefault();
     setInvError('');
     if (!invEmail.trim() || !invName.trim() || !invCourseId) {
-      setInvError('Bitte alle Felder ausfuellen.');
+      setInvError('Bitte alle Felder ausfüllen.');
       return;
     }
     const password = invPassword || 'changeme123';
     const courseTitle = courses.find((c) => c.id === invCourseId)?.title || '';
     try {
       const result = await api.inviteUser({
-        email: invEmail,
-        name: invName,
-        course_id: invCourseId,
-        password: invPassword || undefined,
-        send_email: invSendEmail,
+        email: invEmail, name: invName, course_id: invCourseId,
+        password: invPassword || undefined, send_email: invSendEmail,
       });
       setInviteResult({ name: invName, email: invEmail, password, courseTitle, emailSent: result.email_sent });
       setCopied(false);
-      setInvEmail('');
-      setInvName('');
-      setInvPassword('');
-      setInvCourseId('');
-      setInvSendEmail(false);
-      setShowInvite(false);
+      setInvEmail(''); setInvName(''); setInvPassword(''); setInvCourseId('');
+      setInvSendEmail(false); setShowInvite(false);
       load();
     } catch (err: any) {
       setInvError(err.message || 'Fehler beim Einladen.');
@@ -59,44 +56,30 @@ export default function AdminUsers() {
   };
 
   const handleEnrollUser = async (userId: string, courseId: string) => {
-    try {
-      await api.enrollUser(userId, courseId);
-      setEnrollingUserId(null);
-      load();
-    } catch (err: any) {
-      alert(err.message || 'Fehler beim Zuordnen.');
-    }
+    try { await api.enrollUser(userId, courseId); setEnrollingUserId(null); load(); }
+    catch (err: any) { alert(err.message || 'Fehler beim Zuordnen.'); }
   };
 
   const handleRemoveEnrollment = async (enrollmentId: string, userName: string, courseTitle: string) => {
     if (!confirm(`${userName} aus "${courseTitle}" entfernen?`)) return;
-    await api.removeEnrollment(enrollmentId);
-    load();
+    await api.removeEnrollment(enrollmentId); load();
   };
 
   const handleToggleActive = async (userId: string) => {
-    try {
-      await api.toggleUserActive(userId);
-      load();
-    } catch (err: any) {
-      alert(err.message || 'Fehler.');
-    }
+    try { await api.toggleUserActive(userId); load(); }
+    catch (err: any) { alert(err.message || 'Fehler.'); }
   };
 
   const handleDeleteUser = async (userId: string, name: string) => {
     if (!confirm(`Nutzer "${name}" wirklich löschen? Alle Daten gehen verloren.`)) return;
-    try {
-      await api.deleteUser(userId);
-      load();
-    } catch (err: any) {
-      alert(err.message || 'Fehler beim Löschen.');
-    }
+    try { await api.deleteUser(userId); load(); }
+    catch (err: any) { alert(err.message || 'Fehler beim Löschen.'); }
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-4 border-[var(--nora-coco)] border-t-[var(--nora-soy)]" />
+        <div className="animate-spin rounded-full h-8 w-8 border-4 border-muted border-t-foreground" />
       </div>
     );
   }
@@ -106,276 +89,238 @@ export default function AdminUsers() {
     : users;
 
   return (
-    <div className="p-6">
+    <div className="p-6 max-w-6xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
-        <h2 className="text-lg font-bold text-[var(--nora-soy)]">Teilnehmer</h2>
-        <button
-          onClick={() => setShowInvite(!showInvite)}
-          className="px-4 py-1.5 text-[13px] font-medium bg-[var(--nora-berry)] text-white rounded-lg hover:bg-[var(--nora-berry-dark)] transition-colors"
-        >
-          + Einladen
-        </button>
+        <div>
+          <h2 className="text-lg font-bold">Teilnehmer</h2>
+          <p className="text-sm text-muted-foreground">{users.filter(u => !u.is_admin).length} Mitglieder verwalten</p>
+        </div>
+        <Button onClick={() => setShowInvite(!showInvite)} size="sm">
+          <UserPlus className="h-4 w-4" />
+          Einladen
+        </Button>
       </div>
 
       {/* Invite Form */}
       {showInvite && (
-        <form onSubmit={handleInvite} className="bg-white rounded-xl border border-[var(--nora-coco)] p-5 mb-5 space-y-3">
-          {invError && (
-            <div className="bg-red-50 text-red-600 text-[13px] px-3 py-2 rounded-lg">{invError}</div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[13px] font-medium text-[var(--nora-soy)] mb-1">Name</label>
-              <input
-                type="text"
-                value={invName}
-                onChange={(e) => setInvName(e.target.value)}
-                className="w-full px-3 py-2 text-[13px] border border-[var(--nora-coco)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-berry)] focus:border-transparent"
-                placeholder="Vorname Nachname"
-              />
-            </div>
-            <div>
-              <label className="block text-[13px] font-medium text-[var(--nora-soy)] mb-1">E-Mail</label>
-              <input
-                type="email"
-                value={invEmail}
-                onChange={(e) => setInvEmail(e.target.value)}
-                className="w-full px-3 py-2 text-[13px] border border-[var(--nora-coco)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-berry)] focus:border-transparent"
-                placeholder="nutzer@email.de"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[13px] font-medium text-[var(--nora-soy)] mb-1">Passwort</label>
-              <input
-                type="text"
-                value={invPassword}
-                onChange={(e) => setInvPassword(e.target.value)}
-                className="w-full px-3 py-2 text-[13px] border border-[var(--nora-coco)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-berry)] focus:border-transparent"
-                placeholder="Standard: changeme123"
-              />
-            </div>
-            <div>
-              <label className="block text-[13px] font-medium text-[var(--nora-soy)] mb-1">Kurs</label>
-              <select
-                value={invCourseId}
-                onChange={(e) => setInvCourseId(e.target.value)}
-                className="w-full px-3 py-2 text-[13px] border border-[var(--nora-coco)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-berry)] focus:border-transparent bg-white"
-              >
-                <option value="">Kurs wählen...</option>
-                {courses.map((c) => (
-                  <option key={c.id} value={c.id}>{c.title}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="flex items-center justify-between pt-1">
-            <label className="flex items-center gap-2 text-[13px] text-gray-600 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={invSendEmail}
-                onChange={(e) => setInvSendEmail(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-gray-300 text-[var(--nora-berry)] focus:ring-[var(--nora-berry)]"
-              />
-              Einladung per E-Mail senden
-            </label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setShowInvite(false)}
-                className="px-3 py-1.5 text-[13px] border border-[var(--nora-coco)] rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
-              >
-                Abbrechen
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-1.5 text-[13px] font-medium bg-[var(--nora-berry)] text-white rounded-lg hover:bg-[var(--nora-berry-dark)] transition-colors"
-              >
-                Einladen
-              </button>
-            </div>
-          </div>
-        </form>
+        <Card className="mb-5">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-sm">Neue Teilnehmerin einladen</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleInvite} className="space-y-3">
+              {invError && (
+                <div className="bg-destructive/10 text-destructive text-sm px-3 py-2 rounded-md">{invError}</div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Name</label>
+                  <Input value={invName} onChange={(e) => setInvName(e.target.value)} placeholder="Vorname Nachname" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">E-Mail</label>
+                  <Input type="email" value={invEmail} onChange={(e) => setInvEmail(e.target.value)} placeholder="nutzer@email.de" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Passwort</label>
+                  <Input value={invPassword} onChange={(e) => setInvPassword(e.target.value)} placeholder="Standard: changeme123" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Kurs</label>
+                  <select
+                    value={invCourseId}
+                    onChange={(e) => setInvCourseId(e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="">Kurs wählen...</option>
+                    {courses.map((c) => (
+                      <option key={c.id} value={c.id}>{c.title}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={invSendEmail}
+                    onChange={(e) => setInvSendEmail(e.target.checked)}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                  Einladung per E-Mail senden
+                </label>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setShowInvite(false)}>
+                    Abbrechen
+                  </Button>
+                  <Button type="submit" size="sm">Einladen</Button>
+                </div>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       )}
 
       {/* Invite Result */}
       {inviteResult && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-5 mb-5">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[13px] font-semibold text-green-800">Einladung erstellt</span>
-              {inviteResult.emailSent && (
-                <span className="text-[11px] bg-green-200 text-green-800 px-2 py-0.5 rounded-full">E-Mail gesendet</span>
-              )}
+        <Card className="mb-5 border-green-200 bg-green-50/50">
+          <CardContent className="pt-5">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Badge variant="success">Einladung erstellt</Badge>
+                {inviteResult.emailSent && <Badge variant="success">E-Mail gesendet</Badge>}
+              </div>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setInviteResult(null)}>
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-            <button onClick={() => setInviteResult(null)} className="text-green-600 hover:text-green-800">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </button>
-          </div>
-          <div className="bg-white rounded-lg p-3 text-[13px] text-gray-700 whitespace-pre-line font-mono leading-relaxed">
-            {`Hallo ${inviteResult.name},\n\ndu hast Zugang zum Kurs "${inviteResult.courseTitle}" erhalten!\n\nHier sind deine Zugangsdaten:\n\nLink: ${window.location.origin}/login\nE-Mail: ${inviteResult.email}\nPasswort: ${inviteResult.password}\n\nBitte ändere dein Passwort nach dem ersten Login.\n\nLiebe Grüße\nNora`}
-          </div>
-          <button
-            onClick={() => {
-              const text = `Hallo ${inviteResult.name},\n\ndu hast Zugang zum Kurs "${inviteResult.courseTitle}" erhalten!\n\nHier sind deine Zugangsdaten:\n\nLink: ${window.location.origin}/login\nE-Mail: ${inviteResult.email}\nPasswort: ${inviteResult.password}\n\nBitte ändere dein Passwort nach dem ersten Login.\n\nLiebe Grüße\nNora`;
-              navigator.clipboard.writeText(text.replace(/\\n/g, '\n'));
-              setCopied(true);
-            }}
-            className={`mt-2 px-3 py-1.5 rounded-lg font-medium text-[13px] transition-colors ${
-              copied ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'
-            }`}
-          >
-            {copied ? 'Kopiert!' : 'Nachricht kopieren'}
-          </button>
-        </div>
+            <div className="bg-white rounded-md p-3 text-sm text-muted-foreground whitespace-pre-line font-mono leading-relaxed border">
+              {`Hallo ${inviteResult.name},\n\ndu hast Zugang zum Kurs "${inviteResult.courseTitle}" erhalten!\n\nHier sind deine Zugangsdaten:\n\nLink: ${window.location.origin}/login\nE-Mail: ${inviteResult.email}\nPasswort: ${inviteResult.password}\n\nBitte ändere dein Passwort nach dem ersten Login.\n\nLiebe Grüße\nNora`}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              onClick={() => {
+                const text = `Hallo ${inviteResult.name},\n\ndu hast Zugang zum Kurs "${inviteResult.courseTitle}" erhalten!\n\nHier sind deine Zugangsdaten:\n\nLink: ${window.location.origin}/login\nE-Mail: ${inviteResult.email}\nPasswort: ${inviteResult.password}\n\nBitte ändere dein Passwort nach dem ersten Login.\n\nLiebe Grüße\nNora`;
+                navigator.clipboard.writeText(text.replace(/\\n/g, '\n'));
+                setCopied(true);
+              }}
+            >
+              {copied ? <><Check className="h-3.5 w-3.5" /> Kopiert!</> : <><Copy className="h-3.5 w-3.5" /> Nachricht kopieren</>}
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Table Card */}
-      <div className="bg-white rounded-xl border border-[var(--nora-coco)] overflow-hidden">
-        {/* Filter Bar */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-[var(--nora-coco)]">
-          <select
-            value={filterCourseId}
-            onChange={(e) => setFilterCourseId(e.target.value)}
-            className="px-3 py-1.5 text-[13px] border border-[var(--nora-coco)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-berry)] bg-white"
-          >
-            <option value="">Alle Kurse</option>
-            {courses.map((c) => (
-              <option key={c.id} value={c.id}>{c.title}</option>
-            ))}
-          </select>
-          <span className="text-[13px] text-gray-400">
-            {filteredUsers.filter((u) => !u.is_admin).length} Teilnehmer
-          </span>
-        </div>
+      {/* Users Table */}
+      <Card>
+        <CardContent className="p-0">
+          {/* Filter */}
+          <div className="flex items-center gap-3 px-4 py-3 border-b">
+            <select
+              value={filterCourseId}
+              onChange={(e) => setFilterCourseId(e.target.value)}
+              className="flex h-8 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              <option value="">Alle Kurse</option>
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>{c.title}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">
+              {filteredUsers.filter(u => !u.is_admin).length} Teilnehmer
+            </span>
+          </div>
 
-        {/* Table */}
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[var(--nora-coco)] bg-[#fafaf8]">
-              <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-2.5">Name</th>
-              <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-2.5">E-Mail</th>
-              <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-2.5">Kurse</th>
-              <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-2.5">Status</th>
-              <th className="text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 py-2.5"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredUsers.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="text-center text-[13px] text-gray-400 py-12">
-                  {filterCourseId ? 'Keine Nutzer in diesem Kurs.' : 'Noch keine Nutzer vorhanden.'}
-                </td>
-              </tr>
-            ) : (
-              filteredUsers.map((user) => (
-                <tr key={user.id} className="border-b border-[var(--nora-coco)] last:border-b-0 hover:bg-[#fdfdf8] transition-colors">
-                  {/* Name */}
-                  <td className="px-5 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[13px] font-medium text-[var(--nora-soy)]">{user.name}</span>
-                      {user.is_admin && (
-                        <span className="text-[11px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Admin</span>
-                      )}
-                    </div>
-                  </td>
-
-                  {/* Email */}
-                  <td className="px-5 py-2.5">
-                    <span className="text-[13px] text-gray-500">{user.email}</span>
-                  </td>
-
-                  {/* Courses */}
-                  <td className="px-5 py-2.5">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {user.enrollments.map((enr) => (
-                        <span
-                          key={enr.enrollment_id}
-                          className="inline-flex items-center gap-1 text-[11px] bg-[var(--nora-pink-light)] text-[var(--nora-berry-dark)] px-2 py-0.5 rounded-full"
-                        >
-                          {enr.course_title}
-                          <button
-                            onClick={() => handleRemoveEnrollment(enr.enrollment_id, user.name, enr.course_title)}
-                            className="hover:text-red-500 transition-colors"
-                          >
-                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                            </svg>
-                          </button>
-                        </span>
-                      ))}
-                      {!user.is_admin && (
-                        enrollingUserId === user.id ? (
-                          <select
-                            autoFocus
-                            className="text-[11px] border border-[var(--nora-coco)] rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-[var(--nora-berry)] bg-white"
-                            value=""
-                            onChange={(e) => handleEnrollUser(user.id, e.target.value)}
-                            onBlur={() => setEnrollingUserId(null)}
-                          >
-                            <option value="">+Kurs...</option>
-                            {courses
-                              .filter((c) => !user.enrollments.some((enr) => enr.course_id === c.id))
-                              .map((c) => (
-                                <option key={c.id} value={c.id}>{c.title}</option>
-                              ))}
-                          </select>
-                        ) : (
-                          <button
-                            onClick={() => setEnrollingUserId(user.id)}
-                            className="text-[11px] text-gray-400 hover:text-[var(--nora-berry)] transition-colors px-1"
-                            title="Kurs zuordnen"
-                          >
-                            +
-                          </button>
-                        )
-                      )}
-                    </div>
-                  </td>
-
-                  {/* Status */}
-                  <td className="px-5 py-2.5">
-                    {!user.is_admin && (
-                      <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                        user.is_active
-                          ? 'bg-green-50 text-green-700'
-                          : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${user.is_active ? 'bg-green-500' : 'bg-gray-400'}`} />
-                        {user.is_active ? 'aktiv' : 'inaktiv'}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Actions */}
-                  <td className="px-5 py-2.5 text-right">
-                    {!user.is_admin && (
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleToggleActive(user.id)}
-                          className="text-[12px] text-gray-400 hover:text-[var(--nora-soy)] transition-colors px-2 py-1 rounded hover:bg-gray-50"
-                        >
-                          {user.is_active ? 'Deaktivieren' : 'Aktivieren'}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user.id, user.name)}
-                          className="text-[12px] text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded hover:bg-red-50"
-                        >
-                          Löschen
-                        </button>
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="text-xs">Name</TableHead>
+                <TableHead className="text-xs">E-Mail</TableHead>
+                <TableHead className="text-xs">Kurse</TableHead>
+                <TableHead className="text-xs">Status</TableHead>
+                <TableHead className="text-xs text-right">Aktionen</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.length === 0 ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-12">
+                    {filterCourseId ? 'Keine Nutzer in diesem Kurs.' : 'Noch keine Nutzer vorhanden.'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{user.name}</span>
+                        {user.is_admin && <Badge variant="warning">Admin</Badge>}
                       </div>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1">
+                        {user.enrollments.map((enr) => (
+                          <Badge key={enr.enrollment_id} variant="secondary" className="gap-1 pr-1">
+                            {enr.course_title}
+                            <button
+                              onClick={() => handleRemoveEnrollment(enr.enrollment_id, user.name, enr.course_title)}
+                              className="ml-0.5 rounded-full hover:bg-foreground/10 p-0.5"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                        {!user.is_admin && (
+                          enrollingUserId === user.id ? (
+                            <select
+                              autoFocus
+                              className="h-6 text-xs border border-input rounded px-1 bg-transparent focus:outline-none focus:ring-1 focus:ring-ring"
+                              value=""
+                              onChange={(e) => handleEnrollUser(user.id, e.target.value)}
+                              onBlur={() => setEnrollingUserId(null)}
+                            >
+                              <option value="">+Kurs...</option>
+                              {courses
+                                .filter((c) => !user.enrollments.some((enr) => enr.course_id === c.id))
+                                .map((c) => (
+                                  <option key={c.id} value={c.id}>{c.title}</option>
+                                ))}
+                            </select>
+                          ) : (
+                            <button
+                              onClick={() => setEnrollingUserId(user.id)}
+                              className="inline-flex items-center justify-center h-5 w-5 rounded-full border border-dashed border-muted-foreground/30 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {!user.is_admin && (
+                        <Badge variant={user.is_active ? "success" : "muted"} className="gap-1.5">
+                          <span className={`h-1.5 w-1.5 rounded-full ${user.is_active ? 'bg-green-500' : 'bg-gray-400'}`} />
+                          {user.is_active ? 'aktiv' : 'inaktiv'}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {!user.is_admin && (
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-muted-foreground"
+                            onClick={() => handleToggleActive(user.id)}
+                          >
+                            {user.is_active ? <ShieldOff className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                            {user.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteUser(user.id, user.name)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
