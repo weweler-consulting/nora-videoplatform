@@ -1,0 +1,87 @@
+name: Build & Deploy to Cloudron
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_name: ${{ steps.lowercase.outputs.image_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Lowercase image name
+        id: lowercase
+        run: |
+          echo "IMAGE_NAME_LC=${IMAGE_NAME,,}" >> "$GITHUB_ENV"
+          echo "image_name=${IMAGE_NAME,,}" >> "$GITHUB_OUTPUT"
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}:${{ github.sha }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build-and-push
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Cloudron CLI
+        run: npm install -g cloudron
+      - name: Check if app is installed
+        id: check-app
+        env:
+          CLOUDRON_SERVER: ${{ vars.CLOUDRON_SERVER }}
+          CLOUDRON_TOKEN: ${{ secrets.CLOUDRON_TOKEN }}
+          CLOUDRON_APP_DOMAIN: ${{ vars.CLOUDRON_APP_DOMAIN }}
+        run: |
+          APP_EXISTS=$(cloudron list --server "$CLOUDRON_SERVER" --token "$CLOUDRON_TOKEN" | grep -c "$CLOUDRON_APP_DOMAIN" || true)
+          echo "app_exists=$APP_EXISTS" >> "$GITHUB_OUTPUT"
+      - name: Install app (first deploy)
+        if: steps.check-app.outputs.app_exists == '0'
+        env:
+          CLOUDRON_SERVER: ${{ vars.CLOUDRON_SERVER }}
+          CLOUDRON_TOKEN: ${{ secrets.CLOUDRON_TOKEN }}
+          CLOUDRON_APP_DOMAIN: ${{ vars.CLOUDRON_APP_DOMAIN }}
+          IMAGE: ghcr.io/${{ needs.build-and-push.outputs.image_name }}:${{ github.sha }}
+        run: |
+          cloudron install \
+            --server "$CLOUDRON_SERVER" \
+            --token "$CLOUDRON_TOKEN" \
+            --location "$CLOUDRON_APP_DOMAIN" \
+            --image "$IMAGE"
+      - name: Update app
+        if: steps.check-app.outputs.app_exists != '0'
+        env:
+          CLOUDRON_SERVER: ${{ vars.CLOUDRON_SERVER }}
+          CLOUDRON_TOKEN: ${{ secrets.CLOUDRON_TOKEN }}
+          CLOUDRON_APP_DOMAIN: ${{ vars.CLOUDRON_APP_DOMAIN }}
+          IMAGE: ghcr.io/${{ needs.build-and-push.outputs.image_name }}:${{ github.sha }}
+        run: |
+          cloudron update \
+            --server "$CLOUDRON_SERVER" \
+            --token "$CLOUDRON_TOKEN" \
+            --app "$CLOUDRON_APP_DOMAIN" \
+            --image "$IMAGE"

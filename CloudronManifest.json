@@ -1,0 +1,18 @@
+{
+    "id": "kurse.noraweweler.de",
+    "title": "Nora Videoplatform",
+    "author": "Justus Weweler <justus@kideon.de>",
+    "description": "Video-Kursplattform fuer noraweweler.de",
+    "tagline": "Online-Kurse",
+    "version": "0.1.0",
+    "healthCheckPath": "/api/v1/health",
+    "httpPort": 8000,
+    "addons": {
+        "localstorage": {},
+        "postgresql": {}
+    },
+    "manifestVersion": 2,
+    "website": "https://noraweweler.de",
+    "contactEmail": "justus@kideon.de",
+    "tags": ["video", "courses", "learning", "python", "fastapi"]
+}
