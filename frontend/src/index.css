@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+:root {
+  --nora-pink: #d4a0a0;
+  --nora-pink-light: #f5e6e6;
+  --nora-pink-dark: #b87c7c;
+  --nora-warm: #f9f3f0;
+  --nora-text: #3d3d3d;
+  --nora-green: #4ade80;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--nora-text);
+  background: var(--nora-warm);
+  margin: 0;
+}
