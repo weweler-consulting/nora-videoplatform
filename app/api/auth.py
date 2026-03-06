@@ -74,20 +74,24 @@ class ResetPasswordRequest(BaseModel):
 
 @router.post("/forgot-password")
 async def forgot_password(data: ForgotPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == data.email))
-    user = result.scalar_one_or_none()
-    if not user:
-        # Don't reveal whether user exists
-        return {"ok": True}
-    token = secrets.token_urlsafe(32)
-    user.reset_token = token
-    user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
-    base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
-    reset_url = f"{base}/reset-password?token={token}"
     try:
-        send_password_reset_email(user.email, user.name, reset_url)
+        result = await db.execute(select(User).where(User.email == data.email))
+        user = result.scalar_one_or_none()
+        if not user:
+            return {"ok": True}
+        token = secrets.token_urlsafe(32)
+        user.reset_token = token
+        user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+        await db.flush()
+        base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
+        reset_url = f"{base}/reset-password?token={token}"
+        try:
+            send_password_reset_email(user.email, user.name, reset_url)
+        except Exception as e:
+            logger.error(f"Failed to send password reset email: {e}")
     except Exception as e:
-        logger.error(f"Failed to send password reset email: {e}")
+        logger.error(f"Forgot password error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
     return {"ok": True}
 
 
