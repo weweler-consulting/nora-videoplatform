@@ -27,11 +27,10 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--nora-warm)]">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-light italic text-[var(--nora-pink-dark)]">
-            Nora Weweler
-          </h1>
-          <p className="text-gray-500 mt-2">Kursbereich</p>
+        <div className="flex flex-col items-center mb-8">
+          <img src="/nw-logo.webp" alt="Nora Weweler" className="w-16 h-16 mb-3" />
+          <h1 className="text-sm font-semibold text-gray-800">Nora Weweler</h1>
+          <p className="text-xs text-gray-400">Ernährungsberatung · Kurse</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-8 space-y-5">
