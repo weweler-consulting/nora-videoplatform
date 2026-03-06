@@ -28,12 +28,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex">
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-[var(--nora-pink-light)] flex flex-col shrink-0">
-        <div className="p-6 border-b border-[var(--nora-pink-light)]">
-          <h1 className="text-2xl font-light italic text-[var(--nora-pink-dark)]">
-            Nora Weweler
-          </h1>
+        <div className="p-5 border-b border-[var(--nora-pink-light)]">
+          <div className="flex items-center gap-3">
+            <img src="/nw-logo.webp" alt="NW" className="w-10 h-10" />
+            <div>
+              <h1 className="text-sm font-semibold text-gray-800 leading-tight">Nora Weweler</h1>
+              <p className="text-xs text-gray-400 leading-tight">Ernährungsberatung · Kurse</p>
+            </div>
+          </div>
           {user && (
-            <p className="text-sm text-gray-500 mt-1">{user.name}</p>
+            <div className="mt-4 flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-[var(--nora-pink-light)] flex items-center justify-center text-xs font-semibold text-[var(--nora-pink-dark)]">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <span className="text-sm text-gray-600">{user.name}</span>
+            </div>
           )}
         </div>
 
