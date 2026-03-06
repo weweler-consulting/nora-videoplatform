@@ -16,16 +16,18 @@ from app.api import auth, courses, modules, sections, lessons, users, progress
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Add columns if missing (no Alembic migrations)
-        for stmt in [
-            "ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT TRUE NOT NULL",
-            "ALTER TABLE users ADD COLUMN reset_token VARCHAR",
-            "ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP",
-        ]:
-            try:
+    # Add columns if missing (no Alembic migrations)
+    # Each in its own transaction — PostgreSQL aborts the whole txn on DDL error
+    for stmt in [
+        "ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT TRUE NOT NULL",
+        "ALTER TABLE users ADD COLUMN reset_token VARCHAR",
+        "ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP",
+    ]:
+        try:
+            async with engine.begin() as conn:
                 await conn.execute(text(stmt))
-            except Exception:
-                pass  # Column already exists
+        except Exception:
+            pass  # Column already exists
     yield
 
 
