@@ -72,7 +72,10 @@ Nora"""
     msg.attach(MIMEText(html, "html", "utf-8"))
 
     with smtplib.SMTP(config["server"], config["port"]) as smtp:
-        smtp.starttls()
+        try:
+            smtp.starttls()
+        except smtplib.SMTPNotSupportedError:
+            pass  # Cloudron internal SMTP on port 2525 doesn't need TLS
         smtp.login(config["username"], config["password"])
         smtp.send_message(msg)
 
