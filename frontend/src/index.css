@@ -1,17 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --nora-pink: #d4a0a0;
-  --nora-pink-light: #f5e6e6;
-  --nora-pink-dark: #b87c7c;
-  --nora-warm: #f9f3f0;
-  --nora-text: #3d3d3d;
+  --nora-berry: #D47479;
+  --nora-berry-light: #e8a5a9;
+  --nora-berry-dark: #b85a5f;
+  --nora-coco: #e3e3e3;
+  --nora-cream: #fffef5;
+  --nora-soy: #303030;
+  /* Legacy aliases */
+  --nora-pink: #D47479;
+  --nora-pink-light: #f5e8e9;
+  --nora-pink-dark: #b85a5f;
+  --nora-warm: #fffef5;
+  --nora-text: #303030;
   --nora-green: #4ade80;
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  color: var(--nora-text);
-  background: var(--nora-warm);
+  font-family: 'Almarai', 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--nora-soy);
+  background: var(--nora-cream);
   margin: 0;
 }
