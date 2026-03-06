@@ -18,5 +18,11 @@ if [ -z "$NORA_SECRET_KEY" ]; then
     export NORA_SECRET_KEY=$(cat /app/data/secret_key)
 fi
 
+# Auto-seed on first run
+if [ ! -f /app/data/.seeded ]; then
+    echo "First run: seeding database..."
+    python3 seed.py && touch /app/data/.seeded
+fi
+
 # Start the FastAPI application
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000
