@@ -22,6 +22,7 @@ async def lifespan(app: FastAPI):
         "ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT TRUE NOT NULL",
         "ALTER TABLE users ADD COLUMN reset_token VARCHAR",
         "ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP",
+        "ALTER TABLE modules ADD COLUMN unlock_after_days INTEGER DEFAULT 0 NOT NULL",
     ]:
         try:
             async with engine.begin() as conn:

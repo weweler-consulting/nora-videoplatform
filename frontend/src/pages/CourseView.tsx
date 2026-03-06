@@ -9,11 +9,11 @@ function ModuleCard({ module, courseId }: { module: ModuleItem; courseId: string
     : 0;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+    <div className={`bg-white rounded-2xl shadow-sm overflow-hidden ${module.is_locked ? 'opacity-60' : ''}`}>
       {/* Module header */}
       <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full text-left p-5 flex items-center gap-5 hover:bg-gray-50 transition-colors"
+        onClick={() => !module.is_locked && setExpanded(!expanded)}
+        className={`w-full text-left p-5 flex items-center gap-5 transition-colors ${module.is_locked ? 'cursor-default' : 'hover:bg-gray-50'}`}
       >
         {module.image_url ? (
           <img src={module.image_url} alt="" className="w-20 h-14 object-cover rounded-lg shrink-0" />
@@ -23,17 +23,28 @@ function ModuleCard({ module, courseId }: { module: ModuleItem; courseId: string
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-gray-800">{module.title}</h3>
           <p className="text-sm text-gray-500">
-            {module.total_lessons} Lektionen | {module.total_duration} Min.
+            {module.is_locked
+              ? `Verfügbar ab ${module.unlocks_at}`
+              : <>{module.total_lessons} Lektionen{module.total_duration > 0 ? ` | ${module.total_duration} Min.` : ''}</>
+            }
           </p>
         </div>
         <div className="shrink-0 flex items-center gap-3">
-          <span className="text-sm font-semibold text-[var(--nora-pink-dark)]">{percent}%</span>
-          <svg
-            className={`w-5 h-5 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
-            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+          {module.is_locked ? (
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          ) : (
+            <>
+              <span className="text-sm font-semibold text-[var(--nora-pink-dark)]">{percent}%</span>
+              <svg
+                className={`w-5 h-5 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </>
+          )}
         </div>
       </button>
 
@@ -75,9 +86,11 @@ function ModuleCard({ module, courseId }: { module: ModuleItem; courseId: string
                       </p>
                     </div>
 
-                    <span className="text-xs text-gray-400 shrink-0">
-                      {lesson.duration_minutes} Min.
-                    </span>
+                    {lesson.duration_minutes > 0 && (
+                      <span className="text-xs text-gray-400 shrink-0">
+                        {lesson.duration_minutes} Min.
+                      </span>
+                    )}
                   </Link>
                 ))}
               </div>

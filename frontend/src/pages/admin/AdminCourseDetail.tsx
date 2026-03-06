@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { api, type CourseDetail } from '../../lib/api';
+import { api, type CourseDetail, type ModuleItem } from '../../lib/api';
 
 export default function AdminCourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -141,11 +141,17 @@ export default function AdminCourseDetail() {
                       {module.title}
                     </h3>
                     <p className="text-sm text-gray-500 mt-0.5">
-                      {lessonCount} Lektionen · {module.total_duration} Min.
+                      {lessonCount} Lektionen{module.total_duration > 0 ? ` · ${module.total_duration} Min.` : ''}
+                      {module.unlock_after_days > 0 && (
+                        <span className="ml-2 text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                          nach {module.unlock_after_days} Tagen
+                        </span>
+                      )}
                     </p>
                   </div>
                 </Link>
                 <div className="flex items-center gap-2 shrink-0 ml-4">
+                  <UnlockDaysInput module={module} onSave={load} />
                   <Link
                     to={`/admin/course/${courseId}/module/${module.id}`}
                     className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
@@ -165,5 +171,47 @@ export default function AdminCourseDetail() {
         </div>
       )}
     </div>
+  );
+}
+
+function UnlockDaysInput({ module, onSave }: { module: ModuleItem; onSave: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [days, setDays] = useState(module.unlock_after_days);
+
+  const save = async () => {
+    if (days !== module.unlock_after_days) {
+      await api.updateModule(module.id, { unlock_after_days: days });
+      onSave();
+    }
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          type="number"
+          min={0}
+          value={days || ''}
+          onChange={(e) => setDays(parseInt(e.target.value) || 0)}
+          onBlur={save}
+          onKeyDown={(e) => e.key === 'Enter' && save()}
+          autoFocus
+          className="w-16 px-2 py-1 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--nora-pink)]"
+          placeholder="0"
+        />
+        <span className="text-xs text-gray-400">Tage</span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => { setDays(module.unlock_after_days); setEditing(true); }}
+      className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+      title="Verzögerung in Tagen nach Anmeldung"
+    >
+      {module.unlock_after_days > 0 ? `${module.unlock_after_days}d` : '⏱'}
+    </button>
   );
 }

@@ -29,6 +29,7 @@ class Module(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     image_url: Mapped[str] = mapped_column(String, nullable=True)
+    unlock_after_days: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

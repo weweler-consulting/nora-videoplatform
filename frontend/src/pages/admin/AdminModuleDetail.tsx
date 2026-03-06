@@ -189,7 +189,7 @@ export default function AdminModuleDetail() {
                               Text
                             </span>
                           )}
-                          <span className="text-xs text-gray-400">{lesson.duration_minutes} Min.</span>
+                          {lesson.duration_minutes > 0 && <span className="text-xs text-gray-400">{lesson.duration_minutes} Min.</span>}
                         </div>
                       </div>
                     </div>
@@ -270,13 +270,14 @@ function LessonForm({
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Dauer (Minuten)</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Dauer in Minuten (optional)</label>
         <input
           type="number"
-          value={duration}
+          value={duration || ''}
           onChange={(e) => onDurationChange(parseInt(e.target.value) || 0)}
           className="w-32 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] focus:border-transparent"
           min={0}
+          placeholder="—"
         />
       </div>
       <div className="flex gap-3">

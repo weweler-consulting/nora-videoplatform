@@ -159,6 +159,16 @@ export default function Login() {
           </form>
         )}
       </div>
+
+      <footer className="fixed bottom-0 inset-x-0 py-4 text-center text-xs text-gray-400 space-x-3">
+        <a href="https://noraweweler.de" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--nora-pink)] transition-colors">noraweweler.de</a>
+        <span>·</span>
+        <a href="https://noraweweler.de/impressum" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--nora-pink)] transition-colors">Impressum</a>
+        <span>·</span>
+        <a href="https://noraweweler.de/datenschutz" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--nora-pink)] transition-colors">Datenschutz</a>
+        <span>·</span>
+        <a href="https://noraweweler.de/agbs" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--nora-pink)] transition-colors">AGB</a>
+      </footer>
     </div>
   );
 }

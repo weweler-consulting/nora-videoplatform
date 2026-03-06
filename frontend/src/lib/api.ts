@@ -181,6 +181,9 @@ export interface ModuleItem {
   description: string | null;
   image_url: string | null;
   sort_order: number;
+  unlock_after_days: number;
+  is_locked: boolean;
+  unlocks_at: string | null;
   sections: SectionItem[];
   total_lessons: number;
   completed_lessons: number;

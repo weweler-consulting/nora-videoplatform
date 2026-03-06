@@ -46,6 +46,9 @@ class ModuleOut(BaseModel):
     description: Optional[str]
     image_url: Optional[str]
     sort_order: int
+    unlock_after_days: int = 0
+    is_locked: bool = False
+    unlocks_at: Optional[str] = None
     sections: list[SectionOut] = []
     total_lessons: int = 0
     completed_lessons: int = 0
@@ -82,6 +85,7 @@ class ModuleCreate(BaseModel):
     title: str
     description: Optional[str] = None
     image_url: Optional[str] = None
+    unlock_after_days: int = 0
     sort_order: int = 0
 
 
@@ -89,6 +93,7 @@ class ModuleUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     image_url: Optional[str] = None
+    unlock_after_days: Optional[int] = None
     sort_order: Optional[int] = None
 
 

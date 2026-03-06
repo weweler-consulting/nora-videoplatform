@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,12 +25,22 @@ async def _get_user_progress(db: AsyncSession, user_id: str) -> set[str]:
     return set(result.scalars().all())
 
 
-def _build_course_out(course: Course, completed_ids: set[str]) -> CourseOut:
+def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: datetime | None = None) -> CourseOut:
     modules_out = []
     total_lessons = 0
     total_completed = 0
+    now = datetime.utcnow()
 
     for module in course.modules:
+        # Drip content: check if module is locked
+        is_locked = False
+        unlocks_at = None
+        if enrolled_at and module.unlock_after_days > 0:
+            unlock_date = enrolled_at + timedelta(days=module.unlock_after_days)
+            if now < unlock_date:
+                is_locked = True
+                unlocks_at = unlock_date.strftime("%d.%m.%Y")
+
         sections_out = []
         mod_lessons = 0
         mod_completed = 0
@@ -39,8 +51,10 @@ def _build_course_out(course: Course, completed_ids: set[str]) -> CourseOut:
             for lesson in section.lessons:
                 is_done = lesson.id in completed_ids
                 lessons_out.append(LessonOut(
-                    id=lesson.id, title=lesson.title, description=lesson.description,
-                    video_url=lesson.video_url, duration_minutes=lesson.duration_minutes,
+                    id=lesson.id, title=lesson.title,
+                    description=None if is_locked else lesson.description,
+                    video_url=None if is_locked else lesson.video_url,
+                    duration_minutes=lesson.duration_minutes,
                     sort_order=lesson.sort_order, completed=is_done,
                 ))
                 mod_lessons += 1
@@ -56,6 +70,8 @@ def _build_course_out(course: Course, completed_ids: set[str]) -> CourseOut:
         modules_out.append(ModuleOut(
             id=module.id, title=module.title, description=module.description,
             image_url=module.image_url, sort_order=module.sort_order,
+            unlock_after_days=module.unlock_after_days,
+            is_locked=is_locked, unlocks_at=unlocks_at,
             sections=sections_out, total_lessons=mod_lessons,
             completed_lessons=mod_completed, total_duration=mod_duration,
         ))
@@ -102,10 +118,11 @@ async def list_my_courses(user: User = Depends(get_current_user), db: AsyncSessi
 @router.get("/{course_id}", response_model=CourseOut)
 async def get_course(course_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     # Check enrollment
-    enrollment = await db.execute(
+    enrollment_result = await db.execute(
         select(Enrollment).where(Enrollment.user_id == user.id, Enrollment.course_id == course_id)
     )
-    if not enrollment.scalar_one_or_none():
+    enrollment = enrollment_result.scalar_one_or_none()
+    if not enrollment:
         raise HTTPException(status_code=403, detail="Not enrolled in this course")
 
     result = await db.execute(
@@ -120,7 +137,9 @@ async def get_course(course_id: str, user: User = Depends(get_current_user), db:
         raise HTTPException(status_code=404, detail="Course not found")
 
     completed_ids = await _get_user_progress(db, user.id)
-    return _build_course_out(course, completed_ids)
+    # Admin sees everything unlocked
+    enrolled_at = None if user.is_admin else enrollment.enrolled_at
+    return _build_course_out(course, completed_ids, enrolled_at=enrolled_at)
 
 
 # Admin endpoints
