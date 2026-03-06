@@ -128,6 +128,8 @@ export const api = {
     request('/users/' + userId + '/enroll', { method: 'POST', body: JSON.stringify({ course_id: courseId }) }),
   removeEnrollment: (enrollmentId: string) =>
     request(`/users/enrollment/${enrollmentId}`, { method: 'DELETE' }),
+  getUserProgress: (userId: string) =>
+    request<UserCourseProgress[]>(`/users/${userId}/progress`),
   deleteUser: (userId: string) =>
     request(`/users/${userId}`, { method: 'DELETE' }),
 };
@@ -146,6 +148,23 @@ export interface UserWithEnrollments {
   is_admin: boolean;
   is_active: boolean;
   enrollments: UserEnrollment[];
+}
+
+export interface UserModuleProgress {
+  module_id: string;
+  title: string;
+  total_lessons: number;
+  completed_lessons: number;
+}
+
+export interface UserCourseProgress {
+  course_id: string;
+  title: string;
+  enrolled_at: string | null;
+  total_lessons: number;
+  completed_lessons: number;
+  progress_percent: number;
+  modules: UserModuleProgress[];
 }
 
 export interface CourseListItem {

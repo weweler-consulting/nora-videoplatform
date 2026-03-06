@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.core.db import get_db
 from app.core.auth import require_admin, hash_password
 from app.models.user import User
-from app.models.course import Enrollment, Course
+from app.models.course import Enrollment, Course, Module, Section, Lesson, LessonProgress
 from app.core.email import send_invite_email
 
 logger = logging.getLogger(__name__)
@@ -122,6 +122,67 @@ async def remove_enrollment(enrollment_id: str, admin: User = Depends(require_ad
         raise HTTPException(status_code=404, detail="Enrollment not found")
     await db.delete(enrollment)
     return {"ok": True}
+
+
+@router.get("/{user_id}/progress")
+async def get_user_progress(user_id: str, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Get progress per course for a user."""
+    # Get enrollments with courses
+    result = await db.execute(
+        select(Enrollment)
+        .where(Enrollment.user_id == user_id)
+        .options(
+            selectinload(Enrollment.course)
+            .selectinload(Course.modules)
+            .selectinload(Module.sections)
+            .selectinload(Section.lessons)
+        )
+    )
+    enrollments = result.scalars().unique().all()
+
+    # Get completed lesson IDs
+    progress_result = await db.execute(
+        select(LessonProgress.lesson_id).where(
+            LessonProgress.user_id == user_id, LessonProgress.completed == True
+        )
+    )
+    completed_ids = set(progress_result.scalars().all())
+
+    courses_progress = []
+    for enr in enrollments:
+        course = enr.course
+        total = 0
+        completed = 0
+        modules_progress = []
+
+        for module in course.modules:
+            mod_total = 0
+            mod_completed = 0
+            for section in module.sections:
+                for lesson in section.lessons:
+                    mod_total += 1
+                    if lesson.id in completed_ids:
+                        mod_completed += 1
+            total += mod_total
+            completed += mod_completed
+            modules_progress.append({
+                "module_id": module.id,
+                "title": module.title,
+                "total_lessons": mod_total,
+                "completed_lessons": mod_completed,
+            })
+
+        courses_progress.append({
+            "course_id": course.id,
+            "title": course.title,
+            "enrolled_at": enr.enrolled_at.isoformat() if enr.enrolled_at else None,
+            "total_lessons": total,
+            "completed_lessons": completed,
+            "progress_percent": int((completed / total * 100) if total > 0 else 0),
+            "modules": modules_progress,
+        })
+
+    return courses_progress
 
 
 @router.delete("/{user_id}")
