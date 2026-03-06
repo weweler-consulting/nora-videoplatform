@@ -108,8 +108,8 @@ export const api = {
     request(`/lessons/${id}`, { method: 'DELETE' }),
 
   getUsers: () => request<UserWithEnrollments[]>('/users/'),
-  inviteUser: (data: { email: string; name: string; course_id: string; password?: string }) =>
-    request<{ user_id: string }>('/users/invite', { method: 'POST', body: JSON.stringify(data) }),
+  inviteUser: (data: { email: string; name: string; course_id: string; password?: string; send_email?: boolean }) =>
+    request<{ user_id: string; email_sent: boolean }>('/users/invite', { method: 'POST', body: JSON.stringify(data) }),
   enrollUser: (userId: string, courseId: string) =>
     request('/users/' + userId + '/enroll', { method: 'POST', body: JSON.stringify({ course_id: courseId }) }),
   removeEnrollment: (enrollmentId: string) =>

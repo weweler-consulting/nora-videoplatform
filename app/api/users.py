@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +10,9 @@ from app.core.db import get_db
 from app.core.auth import require_admin, hash_password
 from app.models.user import User
 from app.models.course import Enrollment, Course
+from app.core.email import send_invite_email
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -25,6 +30,7 @@ class InviteRequest(BaseModel):
     name: str
     course_id: str
     password: str = "changeme123"
+    send_email: bool = False
 
 
 @router.get("/", response_model=list[UserWithEnrollments])
@@ -48,7 +54,7 @@ async def list_users(admin: User = Depends(require_admin), db: AsyncSession = De
 
 
 @router.post("/invite", response_model=dict)
-async def invite_user(data: InviteRequest, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+async def invite_user(data: InviteRequest, request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
     if not user:
@@ -62,7 +68,19 @@ async def invite_user(data: InviteRequest, admin: User = Depends(require_admin),
     if not existing.scalar_one_or_none():
         db.add(Enrollment(user_id=user.id, course_id=data.course_id))
 
-    return {"user_id": user.id, "enrolled": True}
+    # Send invite email if requested
+    email_sent = False
+    if data.send_email:
+        course_result = await db.execute(select(Course).where(Course.id == data.course_id))
+        course = course_result.scalar_one_or_none()
+        course_title = course.title if course else "Kurs"
+        login_url = str(request.base_url).rstrip("/") + "/login"
+        try:
+            email_sent = send_invite_email(data.email, data.name, course_title, data.password, login_url)
+        except Exception as e:
+            logger.error(f"Failed to send invite email: {e}")
+
+    return {"user_id": user.id, "enrolled": True, "email_sent": email_sent}
 
 
 @router.post("/{user_id}/enroll")

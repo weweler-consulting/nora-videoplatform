@@ -9,7 +9,8 @@
     "httpPort": 8000,
     "addons": {
         "localstorage": {},
-        "postgresql": {}
+        "postgresql": {},
+        "sendmail": {}
     },
     "manifestVersion": 2,
     "website": "https://noraweweler.de",

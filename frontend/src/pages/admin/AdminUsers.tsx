@@ -13,7 +13,10 @@ export default function AdminUsers() {
   const [invPassword, setInvPassword] = useState('');
   const [invCourseId, setInvCourseId] = useState('');
   const [invError, setInvError] = useState('');
+  const [invSendEmail, setInvSendEmail] = useState(false);
   const [enrollingUserId, setEnrollingUserId] = useState<string | null>(null);
+  const [inviteResult, setInviteResult] = useState<{ name: string; email: string; password: string; courseTitle: string; emailSent: boolean } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const load = () => {
     Promise.all([api.getUsers(), api.getAllCourses()])
@@ -30,17 +33,23 @@ export default function AdminUsers() {
       setInvError('Bitte alle Felder ausfuellen.');
       return;
     }
+    const password = invPassword || 'changeme123';
+    const courseTitle = courses.find((c) => c.id === invCourseId)?.title || '';
     try {
-      await api.inviteUser({
+      const result = await api.inviteUser({
         email: invEmail,
         name: invName,
         course_id: invCourseId,
         password: invPassword || undefined,
+        send_email: invSendEmail,
       });
+      setInviteResult({ name: invName, email: invEmail, password, courseTitle, emailSent: result.email_sent });
+      setCopied(false);
       setInvEmail('');
       setInvName('');
       setInvPassword('');
       setInvCourseId('');
+      setInvSendEmail(false);
       setShowInvite(false);
       load();
     } catch (err: any) {
@@ -147,6 +156,17 @@ export default function AdminUsers() {
               </select>
             </div>
           </div>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={invSendEmail}
+                onChange={(e) => setInvSendEmail(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-[var(--nora-pink)] focus:ring-[var(--nora-pink)]"
+              />
+              Einladung per E-Mail senden
+            </label>
+          </div>
           <div className="flex gap-3">
             <button
               type="submit"
@@ -163,6 +183,44 @@ export default function AdminUsers() {
             </button>
           </div>
         </form>
+      )}
+
+      {inviteResult && (
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <h3 className="font-semibold text-green-800">Einladung erstellt</h3>
+              {inviteResult.emailSent && (
+                <span className="text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full">E-Mail gesendet</span>
+              )}
+            </div>
+            <button
+              onClick={() => setInviteResult(null)}
+              className="text-green-600 hover:text-green-800 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+          <div className="bg-white rounded-lg p-4 text-sm text-gray-700 whitespace-pre-line font-mono leading-relaxed">
+            {`Hallo ${inviteResult.name},\n\ndu hast Zugang zum Kurs "${inviteResult.courseTitle}" erhalten!\n\nHier sind deine Zugangsdaten:\n\n🔗 Link: ${window.location.origin}/login\n📧 E-Mail: ${inviteResult.email}\n🔑 Passwort: ${inviteResult.password}\n\nBitte ändere dein Passwort nach dem ersten Login.\n\nLiebe Grüße\nNora`}
+          </div>
+          <button
+            onClick={() => {
+              const text = `Hallo ${inviteResult.name},\n\ndu hast Zugang zum Kurs "${inviteResult.courseTitle}" erhalten!\n\nHier sind deine Zugangsdaten:\n\nLink: ${window.location.origin}/login\nE-Mail: ${inviteResult.email}\nPasswort: ${inviteResult.password}\n\nBitte ändere dein Passwort nach dem ersten Login.\n\nLiebe Grüße\nNora`;
+              navigator.clipboard.writeText(text.replace(/\\n/g, '\n'));
+              setCopied(true);
+            }}
+            className={`mt-3 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+              copied
+                ? 'bg-green-600 text-white'
+                : 'bg-green-100 text-green-700 hover:bg-green-200'
+            }`}
+          >
+            {copied ? 'Kopiert!' : 'Nachricht kopieren'}
+          </button>
+        </div>
       )}
 
       {users.length === 0 ? (
