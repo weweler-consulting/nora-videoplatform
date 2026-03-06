@@ -110,6 +110,8 @@ export const api = {
   getUsers: () => request<UserWithEnrollments[]>('/users/'),
   inviteUser: (data: { email: string; name: string; course_id: string; password?: string; send_email?: boolean }) =>
     request<{ user_id: string; email_sent: boolean }>('/users/invite', { method: 'POST', body: JSON.stringify(data) }),
+  toggleUserActive: (userId: string) =>
+    request<{ is_active: boolean }>('/users/' + userId + '/toggle-active', { method: 'PUT' }),
   enrollUser: (userId: string, courseId: string) =>
     request('/users/' + userId + '/enroll', { method: 'POST', body: JSON.stringify({ course_id: courseId }) }),
   removeEnrollment: (enrollmentId: string) =>
@@ -130,6 +132,7 @@ export interface UserWithEnrollments {
   email: string;
   name: string;
   is_admin: boolean;
+  is_active: boolean;
   enrollments: UserEnrollment[];
 }
 

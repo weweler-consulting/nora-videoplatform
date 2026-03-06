@@ -22,6 +22,7 @@ class UserWithEnrollments(BaseModel):
     email: str
     name: str
     is_admin: bool
+    is_active: bool = True
     enrollments: list[dict] = []
 
 
@@ -43,7 +44,7 @@ async def list_users(admin: User = Depends(require_admin), db: AsyncSession = De
     users = result.scalars().unique().all()
     return [
         UserWithEnrollments(
-            id=u.id, email=u.email, name=u.name, is_admin=u.is_admin,
+            id=u.id, email=u.email, name=u.name, is_admin=u.is_admin, is_active=u.is_active,
             enrollments=[
                 {"enrollment_id": e.id, "course_id": e.course.id, "course_title": e.course.title}
                 for e in u.enrollments
@@ -99,6 +100,18 @@ async def enroll_user(user_id: str, data: dict, admin: User = Depends(require_ad
         raise HTTPException(status_code=409, detail="Bereits eingeschrieben")
     db.add(Enrollment(user_id=user_id, course_id=course_id))
     return {"ok": True}
+
+
+@router.put("/{user_id}/toggle-active")
+async def toggle_active(user_id: str, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.is_admin:
+        raise HTTPException(status_code=400, detail="Cannot deactivate admin user")
+    user.is_active = not user.is_active
+    return {"is_active": user.is_active}
 
 
 @router.delete("/enrollment/{enrollment_id}")

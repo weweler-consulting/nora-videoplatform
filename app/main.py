@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 
+from sqlalchemy import text
 from app.core.db import engine, Base
 from app.api import auth, courses, modules, sections, lessons, users, progress
 
@@ -15,6 +16,11 @@ from app.api import auth, courses, modules, sections, lessons, users, progress
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Add is_active column if missing (no Alembic migrations)
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT TRUE NOT NULL"))
+        except Exception:
+            pass  # Column already exists
     yield
 
 

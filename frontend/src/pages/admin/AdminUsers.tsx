@@ -73,6 +73,15 @@ export default function AdminUsers() {
     load();
   };
 
+  const handleToggleActive = async (userId: string) => {
+    try {
+      await api.toggleUserActive(userId);
+      load();
+    } catch (err: any) {
+      alert(err.message || 'Fehler.');
+    }
+  };
+
   const handleDeleteUser = async (userId: string, name: string) => {
     if (!confirm(`Nutzer "${name}" wirklich loschen? Alle Daten gehen verloren.`)) return;
     try {
@@ -240,16 +249,37 @@ export default function AdminUsers() {
                         Admin
                       </span>
                     )}
+                    {!user.is_admin && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        user.is_active
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {user.is_active ? 'aktiv' : 'inaktiv'}
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm text-gray-500">{user.email}</p>
                 </div>
                 {!user.is_admin && (
-                  <button
-                    onClick={() => handleDeleteUser(user.id, user.name)}
-                    className="px-3 py-1.5 text-sm border border-red-200 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
-                  >
-                    Loschen
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleToggleActive(user.id)}
+                      className={`px-3 py-1.5 text-sm border rounded-lg transition-colors ${
+                        user.is_active
+                          ? 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                          : 'border-green-200 text-green-600 hover:bg-green-50'
+                      }`}
+                    >
+                      {user.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUser(user.id, user.name)}
+                      className="px-3 py-1.5 text-sm border border-red-200 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                    >
+                      Loschen
+                    </button>
+                  </div>
                 )}
               </div>
 
