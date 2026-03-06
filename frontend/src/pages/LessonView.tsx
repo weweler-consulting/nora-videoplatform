@@ -109,9 +109,10 @@ export default function LessonView() {
       {currentLesson.video_url ? (
         <div className="aspect-video bg-black rounded-2xl overflow-hidden mb-6">
           <iframe
-            src={currentLesson.video_url}
+            src={currentLesson.video_url.replace('player.mediadelivery.net', 'iframe.mediadelivery.net')}
             className="w-full h-full"
-            allow="autoplay; fullscreen; picture-in-picture"
+            loading="lazy"
+            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
             allowFullScreen
           />
         </div>
