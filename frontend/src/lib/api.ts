@@ -52,6 +52,18 @@ export const api = {
 
   me: () => request<{ id: string; email: string; name: string; is_admin: boolean }>('/auth/me'),
 
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request('/auth/password', {
+      method: 'PUT',
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    }),
+
+  updateProfile: (data: { name?: string; email?: string }) =>
+    request<{ id: string; email: string; name: string; is_admin: boolean }>('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
   // Courses (student)
   getMyCourses: () =>
     request<CourseListItem[]>('/courses/'),

@@ -8,6 +8,7 @@ import AdminCourses from './pages/admin/AdminCourses';
 import AdminCourseDetail from './pages/admin/AdminCourseDetail';
 import AdminModuleDetail from './pages/admin/AdminModuleDetail';
 import AdminUsers from './pages/admin/AdminUsers';
+import AdminSettings from './pages/admin/AdminSettings';
 import Layout from './components/Layout';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -33,6 +34,7 @@ export default function App() {
                   <Route path="/admin/course/:courseId" element={<AdminCourseDetail />} />
                   <Route path="/admin/course/:courseId/module/:moduleId" element={<AdminModuleDetail />} />
                   <Route path="/admin/users" element={<AdminUsers />} />
+                  <Route path="/admin/settings" element={<AdminSettings />} />
                 </Routes>
               </Layout>
             </ProtectedRoute>

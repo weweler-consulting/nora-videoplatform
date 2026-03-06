@@ -1,3 +1,5 @@
+from typing import Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,4 +34,36 @@ async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 @router.get("/me", response_model=UserResponse)
 async def me(user: User = Depends(get_current_user)):
+    return UserResponse(id=user.id, email=user.email, name=user.name, is_admin=user.is_admin)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+
+
+@router.put("/password")
+async def change_password(data: ChangePasswordRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    if not verify_password(data.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Aktuelles Passwort ist falsch")
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Passwort muss mindestens 6 Zeichen haben")
+    user.hashed_password = hash_password(data.new_password)
+    return {"ok": True}
+
+
+@router.put("/profile", response_model=UserResponse)
+async def update_profile(data: UpdateProfileRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    if data.name is not None:
+        user.name = data.name
+    if data.email is not None:
+        existing = await db.execute(select(User).where(User.email == data.email, User.id != user.id))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail="E-Mail wird bereits verwendet")
+        user.email = data.email
     return UserResponse(id=user.id, email=user.email, name=user.name, is_admin=user.is_admin)
