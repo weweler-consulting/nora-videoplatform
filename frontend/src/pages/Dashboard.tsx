@@ -2,39 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type CourseListItem } from '../lib/api';
 
-function ProgressRing({ percent, size = 48 }: { percent: number; size?: number }) {
-  const stroke = 4;
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (percent / 100) * circumference;
-
-  return (
-    <svg width={size} height={size} className="transform -rotate-90">
-      <circle
-        cx={size / 2} cy={size / 2} r={radius}
-        stroke="#f5e6e6" strokeWidth={stroke} fill="none"
-      />
-      <circle
-        cx={size / 2} cy={size / 2} r={radius}
-        stroke={percent === 100 ? '#4ade80' : '#d4a0a0'}
-        strokeWidth={stroke} fill="none"
-        strokeDasharray={circumference}
-        strokeDashoffset={offset}
-        strokeLinecap="round"
-        className="transition-all duration-500"
-      />
-      <text
-        x="50%" y="50%"
-        dominantBaseline="central" textAnchor="middle"
-        className="text-xs font-semibold fill-gray-700"
-        transform={`rotate(90, ${size / 2}, ${size / 2})`}
-      >
-        {percent}%
-      </text>
-    </svg>
-  );
-}
-
 export default function Dashboard() {
   const [courses, setCourses] = useState<CourseListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,33 +40,43 @@ export default function Dashboard() {
           Du bist noch in keinem Kurs eingeschrieben.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {courses.map((course) => (
             <Link
               key={course.id}
               to={`/course/${course.id}`}
-              className="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
+              className="bg-gradient-to-r from-[var(--nora-pink)] to-[var(--nora-pink-dark)] rounded-2xl p-8 flex items-center justify-between text-white hover:shadow-lg transition-shadow group"
             >
-              {course.image_url ? (
-                <div
-                  className="h-40 bg-cover bg-center"
-                  style={{ backgroundImage: `url(${course.image_url})` }}
-                />
-              ) : (
-                <div className="h-40 bg-gradient-to-br from-[var(--nora-pink-light)] to-[var(--nora-pink)] flex items-center justify-center">
-                  <span className="text-white text-xl font-light italic">{course.title}</span>
-                </div>
-              )}
-              <div className="p-5 flex items-center justify-between">
-                <div>
-                  <h4 className="font-semibold text-gray-800 group-hover:text-[var(--nora-pink-dark)] transition-colors">
-                    {course.title}
-                  </h4>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {course.completed_lessons} / {course.total_lessons} Lektionen
-                  </p>
-                </div>
-                <ProgressRing percent={course.progress_percent} />
+              <div>
+                <p className="text-sm opacity-80 uppercase tracking-wider">Kurs</p>
+                <h4 className="text-xl font-semibold mt-1">{course.title}</h4>
+                {course.description && (
+                  <p className="mt-2 opacity-90 text-sm">{course.description}</p>
+                )}
+                <p className="text-sm opacity-70 mt-3">
+                  {course.completed_lessons} / {course.total_lessons} Lektionen
+                </p>
+              </div>
+              <div className="shrink-0 ml-6">
+                <svg width="64" height="64" className="transform -rotate-90">
+                  <circle cx="32" cy="32" r="27" stroke="rgba(255,255,255,0.3)" strokeWidth="5" fill="none" />
+                  <circle
+                    cx="32" cy="32" r="27"
+                    stroke="white" strokeWidth="5" fill="none"
+                    strokeDasharray={2 * Math.PI * 27}
+                    strokeDashoffset={2 * Math.PI * 27 - (course.progress_percent / 100) * 2 * Math.PI * 27}
+                    strokeLinecap="round"
+                    className="transition-all duration-500"
+                  />
+                  <text
+                    x="50%" y="50%"
+                    dominantBaseline="central" textAnchor="middle"
+                    className="text-sm font-bold fill-white"
+                    transform="rotate(90, 32, 32)"
+                  >
+                    {course.progress_percent}%
+                  </text>
+                </svg>
               </div>
             </Link>
           ))}
