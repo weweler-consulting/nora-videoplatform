@@ -74,7 +74,8 @@ async def invite_user(data: InviteRequest, request: Request, admin: User = Depen
         course_result = await db.execute(select(Course).where(Course.id == data.course_id))
         course = course_result.scalar_one_or_none()
         course_title = course.title if course else "Kurs"
-        login_url = str(request.base_url).rstrip("/") + "/login"
+        base = str(request.base_url).rstrip("/")
+        login_url = base.replace("http://", "https://", 1) + "/login"
         try:
             email_sent = send_invite_email(data.email, data.name, course_title, data.password, login_url)
         except Exception as e:

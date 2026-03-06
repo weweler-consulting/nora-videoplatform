@@ -34,7 +34,7 @@ export default function App() {
                   <Route path="/admin/course/:courseId" element={<AdminCourseDetail />} />
                   <Route path="/admin/course/:courseId/module/:moduleId" element={<AdminModuleDetail />} />
                   <Route path="/admin/users" element={<AdminUsers />} />
-                  <Route path="/admin/settings" element={<AdminSettings />} />
+                  <Route path="/settings" element={<AdminSettings />} />
                 </Routes>
               </Layout>
             </ProtectedRoute>
