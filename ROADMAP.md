@@ -19,33 +19,14 @@
 - Datei-Downloads pro Lektion (PDFs, Rezepte, Worksheets)
 - Rich-Text/Markdown für Lektionen (formatierter Text unter Videos)
 
-## Offene Features — sortiert nach Business Impact
+## Offene Features — sortiert nach Business Impact + Aufwand
 
-### Retention (hält Teilnehmer dran → weniger Refunds, mehr Empfehlungen)
-
-| # | Feature | Impact | Aufwand |
-|---|---|---|---|
-| 1 | **E-Mail bei Modul-Freischaltung** | Teilnehmer merken sonst nicht, dass neuer Content da ist. Aktiviert die Drip-Funktion richtig. | Mittel |
-| 2 | **E-Mail-Automationen** | Erinnerungen bei Inaktivität, Motivations-Mails, Drip-Sequenzen. Reduziert Abbruchrate massiv. | Groß |
-| 3 | **Kommentar/Fragen pro Lektion** | Teilnehmer stellen Fragen, Nora antwortet — Community-Gefühl, persönliche Bindung. | Mittel |
-
-### Lernerfolg (bessere Ergebnisse → bessere Testimonials → mehr Verkäufe)
-
-| # | Feature | Impact | Aufwand |
-|---|---|---|---|
-| 4 | **Quiz/Tests** | Multiple-Choice pro Lektion — festigt Gelerntes, gibt Teilnehmern Erfolgserlebnisse. | Mittel |
-| 5 | **Aufgaben/Submissions** | Teilnehmer reichen Fotos/Texte ein (z.B. Ernährungstagebuch). Tiefes Engagement. | Groß |
-| 6 | **Zertifikat bei Abschluss** | Auto-PDF bei 100% — Motivation zum Durchziehen, teilbar auf Social Media. | Mittel |
-
-### Skalierung (wird relevant ab mehreren Kursen/Durchgängen)
-
-| # | Feature | Impact | Aufwand |
-|---|---|---|---|
-| 7 | **Gruppen/Kohorten** | Teilnehmer in Durchgänge einteilen. Relevant wenn gleicher Kurs mehrfach verkauft wird. | Mittel |
-
-## Empfohlene Reihenfolge
-
-1. **E-Mail bei Modul-Freischaltung** — aktiviert Drip richtig
-2. **E-Mail-Automationen** — Retention-Hebel
-3. **Kommentar/Fragen** — Community-Gefühl
-4. **Zertifikat bei Abschluss** — Motivation + Social Proof
+| # | Feature | Business Impact | Aufwand | Warum diese Reihenfolge |
+|---|---|---|---|---|
+| 1 | **E-Mail bei Modul-Freischaltung** | Hoch | Mittel | Ohne das ist Drip-Content nutzlos — Teilnehmer merken nicht, dass neuer Content da ist. Direkt weniger Abbrüche. |
+| 2 | **Zertifikat bei Abschluss** | Hoch | Mittel | Auto-PDF bei 100% — Teilnehmer teilen es auf Social Media = kostenlose Werbung. Motiviert zum Durchziehen = weniger Refunds. |
+| 3 | **E-Mail-Automationen** | Hoch | Groß | Inaktivitäts-Reminder, Motivations-Mails. Größter Retention-Hebel, aber auch größter Aufwand. |
+| 4 | **Kommentar/Fragen pro Lektion** | Mittel | Mittel | Community-Gefühl, persönliche Bindung zu Nora. Gut für Empfehlungen, aber kein direkter Umsatz-Treiber. |
+| 5 | **Quiz/Tests** | Mittel | Mittel | Multiple-Choice festigt Gelerntes. Gibt Erfolgserlebnisse, aber Teilnehmer kaufen nicht wegen Quiz. |
+| 6 | **Aufgaben/Submissions** | Mittel | Groß | Ernährungstagebuch etc. Tiefes Engagement, aber großer Aufwand und erst sinnvoll mit aktiver Community. |
+| 7 | **Gruppen/Kohorten** | Niedrig | Mittel | Erst relevant wenn gleicher Kurs mehrfach als Durchgang verkauft wird. Heute nicht nötig. |
