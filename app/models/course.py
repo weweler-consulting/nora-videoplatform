@@ -65,6 +65,7 @@ class Lesson(Base):
 
     section = relationship("Section", back_populates="lessons")
     progress = relationship("LessonProgress", back_populates="lesson", cascade="all, delete-orphan")
+    attachments = relationship("LessonAttachment", back_populates="lesson", cascade="all, delete-orphan")
 
 
 class Enrollment(Base):
@@ -77,6 +78,19 @@ class Enrollment(Base):
 
     user = relationship("User", back_populates="enrollments")
     course = relationship("Course", back_populates="enrollments")
+
+
+class LessonAttachment(Base):
+    __tablename__ = "lesson_attachments"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    lesson_id: Mapped[str] = mapped_column(String, ForeignKey("lessons.id"), nullable=False)
+    filename: Mapped[str] = mapped_column(String, nullable=False)
+    original_filename: Mapped[str] = mapped_column(String, nullable=False)
+    file_size: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    lesson = relationship("Lesson", back_populates="attachments")
 
 
 class LessonProgress(Base):

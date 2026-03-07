@@ -144,6 +144,23 @@ export const api = {
     request<UserCourseProgress[]>(`/users/${userId}/progress`),
   deleteUser: (userId: string) =>
     request(`/users/${userId}`, { method: 'DELETE' }),
+  uploadAttachment: (lessonId: string, file: File) => {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('file', file);
+    return fetch(`${API_BASE}/lessons/${lessonId}/attachments`, {
+      method: 'POST',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: formData,
+    }).then(res => {
+      if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+      return res.json() as Promise<AttachmentItem>;
+    });
+  },
+  getAttachments: (lessonId: string) =>
+    request<AttachmentItem[]>(`/lessons/${lessonId}/attachments`),
+  deleteAttachment: (attachmentId: string) =>
+    request<{ ok: boolean }>(`/attachments/${attachmentId}`, { method: 'DELETE' }),
   getDashboardStats: () =>
     request<{
       total_users: number;
@@ -201,6 +218,12 @@ export interface CourseListItem {
   total_lessons: number;
   completed_lessons: number;
   progress_percent: number;
+}
+
+export interface AttachmentItem {
+  id: string;
+  original_filename: string;
+  file_size: number;
 }
 
 export interface LessonItem {

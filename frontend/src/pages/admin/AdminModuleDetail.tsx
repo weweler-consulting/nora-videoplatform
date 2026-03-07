@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import * as tus from 'tus-js-client';
-import { api, type CourseDetail, type LessonItem } from '../../lib/api';
+import { api, type CourseDetail, type LessonItem, type AttachmentItem } from '../../lib/api';
 
 export default function AdminModuleDetail() {
   const { courseId, moduleId } = useParams<{ courseId: string; moduleId: string }>();
@@ -155,6 +155,7 @@ export default function AdminModuleDetail() {
             <div key={lesson.id}>
               {editingId === lesson.id ? (
                 <LessonForm
+                  lessonId={lesson.id}
                   title={formTitle}
                   videoUrl={formVideoUrl}
                   description={formDescription}
@@ -220,10 +221,11 @@ export default function AdminModuleDetail() {
 }
 
 function LessonForm({
-  title, videoUrl, description, duration,
+  lessonId, title, videoUrl, description, duration,
   onTitleChange, onVideoUrlChange, onDescriptionChange, onDurationChange,
   onSubmit, onCancel, submitLabel,
 }: {
+  lessonId?: string;
   title: string;
   videoUrl: string;
   description: string;
@@ -237,9 +239,18 @@ function LessonForm({
   submitLabel: string;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const attachInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState('');
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+  const [attachUploading, setAttachUploading] = useState(false);
+
+  useEffect(() => {
+    if (lessonId) {
+      api.getAttachments(lessonId).then(setAttachments).catch(console.error);
+    }
+  }, [lessonId]);
 
   const handleFileUpload = async (file: File) => {
     const videoTitle = title || file.name.replace(/\.[^/.]+$/, '');
@@ -411,6 +422,65 @@ function LessonForm({
           placeholder="—"
         />
       </div>
+      {/* Attachments (only when editing) */}
+      {lessonId && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Dateien / Downloads</label>
+          {attachments.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {attachments.map((a) => (
+                <div key={a.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-sm text-gray-700 truncate">{a.original_filename}</span>
+                    <span className="text-xs text-gray-400 shrink-0">{(a.file_size / 1024).toFixed(0)} KB</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm(`"${a.original_filename}" löschen?`)) return;
+                      await api.deleteAttachment(a.id);
+                      setAttachments(prev => prev.filter(x => x.id !== a.id));
+                    }}
+                    className="text-xs text-gray-400 hover:text-red-500 transition-colors ml-2 shrink-0"
+                  >
+                    Entfernen
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            disabled={attachUploading}
+            onClick={() => attachInputRef.current?.click()}
+            className="text-sm text-[var(--nora-pink-dark)] hover:text-[var(--nora-pink)] transition-colors disabled:opacity-50"
+          >
+            {attachUploading ? 'Wird hochgeladen...' : '+ Datei hinzufügen'}
+          </button>
+          <input
+            ref={attachInputRef}
+            type="file"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file || !lessonId) return;
+              setAttachUploading(true);
+              try {
+                const att = await api.uploadAttachment(lessonId, file);
+                setAttachments(prev => [...prev, att]);
+              } catch (err) {
+                console.error('Attachment upload failed:', err);
+              }
+              setAttachUploading(false);
+              e.target.value = '';
+            }}
+          />
+        </div>
+      )}
+
       <div className="flex gap-3">
         <button
           type="submit"
