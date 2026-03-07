@@ -5,7 +5,17 @@ from email.mime.multipart import MIMEMultipart
 
 
 def get_smtp_config() -> dict | None:
-    """Get SMTP config from Cloudron environment variables."""
+    """Get SMTP config — prefers Resend, falls back to Cloudron."""
+    resend_key = os.environ.get("RESEND_API_KEY")
+    if resend_key:
+        return {
+            "server": "smtp.resend.com",
+            "port": 465,
+            "username": "resend",
+            "password": resend_key,
+            "from_addr": os.environ.get("MAIL_FROM", "Nora Weweler <nora@noraweweler.de>"),
+        }
+    # Fallback: Cloudron built-in SMTP
     server = os.environ.get("CLOUDRON_MAIL_SMTP_SERVER")
     port = os.environ.get("CLOUDRON_MAIL_SMTP_PORT")
     username = os.environ.get("CLOUDRON_MAIL_SMTP_USERNAME")
@@ -79,13 +89,18 @@ Nora"""
 
 
 def _send_smtp(config: dict, msg: MIMEMultipart):
-    with smtplib.SMTP(config["server"], config["port"]) as smtp:
-        try:
-            smtp.starttls()
-        except smtplib.SMTPNotSupportedError:
-            pass  # Cloudron internal SMTP on port 2525 doesn't need TLS
-        smtp.login(config["username"], config["password"])
-        smtp.send_message(msg)
+    if config["port"] == 465:
+        with smtplib.SMTP_SSL(config["server"], config["port"]) as smtp:
+            smtp.login(config["username"], config["password"])
+            smtp.send_message(msg)
+    else:
+        with smtplib.SMTP(config["server"], config["port"]) as smtp:
+            try:
+                smtp.starttls()
+            except smtplib.SMTPNotSupportedError:
+                pass  # Cloudron internal SMTP on port 2525 doesn't need TLS
+            smtp.login(config["username"], config["password"])
+            smtp.send_message(msg)
 
 
 def send_module_unlocked_email(
