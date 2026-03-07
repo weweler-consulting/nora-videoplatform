@@ -364,7 +364,16 @@ function LessonForm({
                 </span>
                 <button
                   type="button"
-                  onClick={() => onVideoUrlChange('')}
+                  onClick={async () => {
+                    if (videoUrl && confirm('Video auch bei Bunny.net löschen?')) {
+                      try {
+                        await api.deleteVideo(videoUrl);
+                      } catch (e) {
+                        console.error('Failed to delete video from Bunny:', e);
+                      }
+                    }
+                    onVideoUrlChange('');
+                  }}
                   className="text-xs text-gray-400 hover:text-red-500 transition-colors"
                 >
                   Entfernen

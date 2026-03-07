@@ -56,3 +56,34 @@ async def create_video(data: CreateVideoRequest, admin: User = Depends(require_a
         "auth_expiration": expiration,
         "embed_url": embed_url,
     }
+
+
+class DeleteVideoRequest(BaseModel):
+    embed_url: str
+
+
+@router.post("/delete-video")
+async def delete_video(data: DeleteVideoRequest, admin: User = Depends(require_admin)):
+    """Delete a video from Bunny.net by its embed URL."""
+    api_key = BUNNY_API_KEY
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Bunny.net nicht konfiguriert")
+
+    # Parse library_id and video_id from embed URL
+    # Format: https://iframe.mediadelivery.net/embed/{libraryId}/{videoId}
+    try:
+        parts = data.embed_url.rstrip("/").split("/")
+        video_id = parts[-1]
+        library_id = parts[-2]
+    except (IndexError, ValueError):
+        raise HTTPException(status_code=400, detail="Ungültige Video-URL")
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.delete(
+            f"https://video.bunnycdn.com/library/{library_id}/videos/{video_id}",
+            headers={"AccessKey": api_key},
+        )
+        if resp.status_code not in (200, 204):
+            raise HTTPException(status_code=502, detail=f"Bunny API error: {resp.text}")
+
+    return {"ok": True}

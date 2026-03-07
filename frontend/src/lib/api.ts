@@ -144,6 +144,11 @@ export const api = {
     request<UserCourseProgress[]>(`/users/${userId}/progress`),
   deleteUser: (userId: string) =>
     request(`/users/${userId}`, { method: 'DELETE' }),
+  deleteVideo: (embedUrl: string) =>
+    request<{ ok: boolean }>('/upload/delete-video', {
+      method: 'POST',
+      body: JSON.stringify({ embed_url: embedUrl }),
+    }),
 };
 
 // Types
