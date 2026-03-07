@@ -18,6 +18,8 @@
 - Stripe-Kaufflow (Payment Link → automatisch Account + Kurs + Zugangsdaten per E-Mail)
 - Datei-Downloads pro Lektion (PDFs, Rezepte, Worksheets)
 - Rich-Text/Markdown für Lektionen (formatierter Text unter Videos)
+- Manuelles Modul-Freischalten pro Teilnehmer (Drip-Override im User-Sheet)
+- Klickbare Navigation zurück zur Kursübersicht aus der Lektionsansicht
 
 ## Offene Features — sortiert nach Business Impact + Aufwand
 
