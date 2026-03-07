@@ -52,7 +52,10 @@ Liebe Gruesse
 Nora"""
 
     html = f"""<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 500px; margin: 0 auto; padding: 32px;">
-  <h2 style="color: #d4768c; font-weight: 300; font-style: italic; margin-bottom: 24px;">Nora Weweler</h2>
+  <div style="text-align: center; margin-bottom: 24px;">
+    <img src="https://kurse.noraweweler.de/nw-logo.webp" alt="Nora Weweler" width="64" height="64" style="width: 64px; height: 64px; margin-bottom: 8px;" />
+    <p style="font-size: 14px; font-weight: 600; color: #1f2937; margin: 0; letter-spacing: 0.025em;">Nora Weweler</p>
+  </div>
   <p>Hallo {to_name},</p>
   <p>du hast Zugang zum Kurs <strong>"{course_title}"</strong> erhalten!</p>
   <div style="background: #fdf2f4; border-radius: 12px; padding: 20px; margin: 24px 0;">
@@ -112,7 +115,10 @@ Liebe Gruesse
 Nora"""
 
     html = f"""<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 500px; margin: 0 auto; padding: 32px;">
-  <h2 style="color: #d4768c; font-weight: 300; font-style: italic; margin-bottom: 24px;">Nora Weweler</h2>
+  <div style="text-align: center; margin-bottom: 24px;">
+    <img src="https://kurse.noraweweler.de/nw-logo.webp" alt="Nora Weweler" width="64" height="64" style="width: 64px; height: 64px; margin-bottom: 8px;" />
+    <p style="font-size: 14px; font-weight: 600; color: #1f2937; margin: 0; letter-spacing: 0.025em;">Nora Weweler</p>
+  </div>
   <p>Hallo {to_name},</p>
   <p>gute Neuigkeiten! Ein neues Modul in deinem Kurs <strong>&quot;{course_title}&quot;</strong> wurde freigeschaltet:</p>
   <div style="background: #fdf2f4; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
@@ -159,7 +165,10 @@ Liebe Grüße
 Nora"""
 
     html = f"""<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 500px; margin: 0 auto; padding: 32px;">
-  <h2 style="color: #d4768c; font-weight: 300; font-style: italic; margin-bottom: 24px;">Nora Weweler</h2>
+  <div style="text-align: center; margin-bottom: 24px;">
+    <img src="https://kurse.noraweweler.de/nw-logo.webp" alt="Nora Weweler" width="64" height="64" style="width: 64px; height: 64px; margin-bottom: 8px;" />
+    <p style="font-size: 14px; font-weight: 600; color: #1f2937; margin: 0; letter-spacing: 0.025em;">Nora Weweler</p>
+  </div>
   <p>Hallo {to_name},</p>
   <p>du hast angefordert, dein Passwort zur&uuml;ckzusetzen.</p>
   <div style="text-align: center; margin: 32px 0;">
