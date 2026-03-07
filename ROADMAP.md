@@ -20,15 +20,15 @@
 - Rich-Text/Markdown für Lektionen (formatierter Text unter Videos)
 - Manuelles Modul-Freischalten pro Teilnehmer (Drip-Override im User-Sheet)
 - Klickbare Navigation zurück zur Kursübersicht aus der Lektionsansicht
+- E-Mail bei Modul-Freischaltung (Drip-Benachrichtigung)
 
 ## Offene Features — sortiert nach Business Impact + Aufwand
 
 | # | Feature | Business Impact | Aufwand | Warum diese Reihenfolge |
 |---|---|---|---|---|
-| 1 | **E-Mail bei Modul-Freischaltung** | Hoch | Mittel | Ohne das ist Drip-Content nutzlos — Teilnehmer merken nicht, dass neuer Content da ist. Direkt weniger Abbrüche. |
-| 2 | **Zertifikat bei Abschluss** | Hoch | Mittel | Auto-PDF bei 100% — Teilnehmer teilen es auf Social Media = kostenlose Werbung. Motiviert zum Durchziehen = weniger Refunds. |
-| 3 | **E-Mail-Automationen** | Hoch | Groß | Inaktivitäts-Reminder, Motivations-Mails. Größter Retention-Hebel, aber auch größter Aufwand. |
-| 4 | **Kommentar/Fragen pro Lektion** | Mittel | Mittel | Community-Gefühl, persönliche Bindung zu Nora. Gut für Empfehlungen, aber kein direkter Umsatz-Treiber. |
-| 5 | **Quiz/Tests** | Mittel | Mittel | Multiple-Choice festigt Gelerntes. Gibt Erfolgserlebnisse, aber Teilnehmer kaufen nicht wegen Quiz. |
-| 6 | **Aufgaben/Submissions** | Mittel | Groß | Ernährungstagebuch etc. Tiefes Engagement, aber großer Aufwand und erst sinnvoll mit aktiver Community. |
-| 7 | **Gruppen/Kohorten** | Niedrig | Mittel | Erst relevant wenn gleicher Kurs mehrfach als Durchgang verkauft wird. Heute nicht nötig. |
+| 1 | **Zertifikat bei Abschluss** | Hoch | Mittel | Auto-PDF bei 100% — Teilnehmer teilen es auf Social Media = kostenlose Werbung. Motiviert zum Durchziehen = weniger Refunds. |
+| 2 | **E-Mail-Automationen** | Hoch | Groß | Inaktivitäts-Reminder, Motivations-Mails. Größter Retention-Hebel, aber auch größter Aufwand. |
+| 3 | **Kommentar/Fragen pro Lektion** | Mittel | Mittel | Community-Gefühl, persönliche Bindung zu Nora. Gut für Empfehlungen, aber kein direkter Umsatz-Treiber. |
+| 4 | **Quiz/Tests** | Mittel | Mittel | Multiple-Choice festigt Gelerntes. Gibt Erfolgserlebnisse, aber Teilnehmer kaufen nicht wegen Quiz. |
+| 5 | **Aufgaben/Submissions** | Mittel | Groß | Ernährungstagebuch etc. Tiefes Engagement, aber großer Aufwand und erst sinnvoll mit aktiver Community. |
+| 6 | **Gruppen/Kohorten** | Niedrig | Mittel | Erst relevant wenn gleicher Kurs mehrfach als Durchgang verkauft wird. Heute nicht nötig. |
