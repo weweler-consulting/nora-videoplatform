@@ -99,16 +99,24 @@ export default function LessonView() {
         <span className="text-gray-700 truncate">{currentLesson.title}</span>
       </div>
 
-      {/* Module header bar */}
-      <div className="bg-gradient-to-r from-[var(--nora-pink)] to-[var(--nora-pink-dark)] rounded-2xl p-5 mb-6 flex items-center justify-between text-white">
-        <div>
-          <p className="text-xs opacity-80 uppercase tracking-wider">{sectionName}</p>
-          <h2 className="text-lg font-semibold">{moduleName}</h2>
+      {/* Module header bar — clickable back to course */}
+      <Link
+        to={`/course/${courseId}`}
+        className="bg-gradient-to-r from-[var(--nora-pink)] to-[var(--nora-pink-dark)] rounded-2xl p-5 mb-6 flex items-center justify-between text-white group block hover:opacity-95 transition-opacity"
+      >
+        <div className="flex items-center gap-3">
+          <svg className="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          <div>
+            <p className="text-xs opacity-80 uppercase tracking-wider">{sectionName}</p>
+            <h2 className="text-lg font-semibold">{moduleName}</h2>
+          </div>
         </div>
         <p className="text-sm opacity-80">
           {currentIndex + 1} / {allLessons.length}
         </p>
-      </div>
+      </Link>
 
       {/* Lesson title */}
       <h2 className="text-xl font-semibold mb-6">{currentLesson.title}</h2>
