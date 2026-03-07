@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import * as tus from 'tus-js-client';
 import { api, type CourseDetail, type LessonItem } from '../../lib/api';
 
 export default function AdminModuleDetail() {
@@ -235,6 +236,54 @@ function LessonForm({
   onCancel: () => void;
   submitLabel: string;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState('');
+
+  const handleFileUpload = async (file: File) => {
+    const videoTitle = title || file.name.replace(/\.[^/.]+$/, '');
+    setUploading(true);
+    setUploadProgress(0);
+    setUploadError('');
+
+    try {
+      const uploadInfo = await api.createVideoUpload(videoTitle);
+
+      const upload = new tus.Upload(file, {
+        endpoint: uploadInfo.tus_endpoint,
+        retryDelays: [0, 3000, 5000, 10000],
+        metadata: {
+          filetype: file.type,
+          title: videoTitle,
+        },
+        headers: {
+          AuthorizationSignature: uploadInfo.auth_signature,
+          AuthorizationExpire: String(uploadInfo.auth_expiration),
+          VideoId: uploadInfo.video_id,
+          LibraryId: uploadInfo.library_id,
+        },
+        onError: (error) => {
+          setUploadError(error.message || 'Upload fehlgeschlagen');
+          setUploading(false);
+        },
+        onProgress: (bytesUploaded, bytesTotal) => {
+          setUploadProgress(Math.round((bytesUploaded / bytesTotal) * 100));
+        },
+        onSuccess: () => {
+          onVideoUrlChange(uploadInfo.embed_url);
+          setUploading(false);
+          setUploadProgress(100);
+        },
+      });
+
+      upload.start();
+    } catch (err: any) {
+      setUploadError(err.message || 'Fehler beim Erstellen des Uploads');
+      setUploading(false);
+    }
+  };
+
   return (
     <form onSubmit={onSubmit} className="bg-white rounded-2xl p-6 mb-3 shadow-sm space-y-4">
       <div>
@@ -249,15 +298,88 @@ function LessonForm({
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Video-URL (Embed-Link)</label>
-        <input
-          type="url"
-          value={videoUrl}
-          onChange={(e) => onVideoUrlChange(e.target.value)}
-          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] focus:border-transparent"
-          placeholder="https://iframe.mediadelivery.net/embed/..."
-        />
-        <p className="text-xs text-gray-400 mt-1">Bunny.net, Vimeo oder YouTube Embed-URL</p>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Video</label>
+        {/* Upload area */}
+        {!videoUrl && !uploading && (
+          <div
+            className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center cursor-pointer hover:border-[var(--nora-pink)] hover:bg-[var(--nora-pink-light)]/20 transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const file = e.dataTransfer.files[0];
+              if (file?.type.startsWith('video/')) handleFileUpload(file);
+            }}
+          >
+            <svg className="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <p className="text-sm text-gray-500">Video hierher ziehen oder klicken</p>
+            <p className="text-xs text-gray-400 mt-1">MP4, MOV, MKV — wird auf Bunny.net gespeichert</p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFileUpload(file);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Upload progress */}
+        {uploading && (
+          <div className="border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-gray-600">Video wird hochgeladen...</span>
+              <span className="text-sm font-medium">{uploadProgress}%</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[var(--nora-pink)] rounded-full transition-all"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Upload error */}
+        {uploadError && (
+          <div className="bg-red-50 text-red-600 text-sm px-3 py-2 rounded-lg mt-2">{uploadError}</div>
+        )}
+
+        {/* Video URL (shown after upload or for manual entry) */}
+        {(videoUrl || (!uploading && !uploadError)) && (
+          <div className={videoUrl ? 'mt-2' : 'mt-3'}>
+            {videoUrl && (
+              <div className="flex items-center gap-2 mb-2">
+                <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                  </svg>
+                  Video verknüpft
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onVideoUrlChange('')}
+                  className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  Entfernen
+                </button>
+              </div>
+            )}
+            <input
+              type="url"
+              value={videoUrl}
+              onChange={(e) => onVideoUrlChange(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] focus:border-transparent text-sm"
+              placeholder="Oder Embed-URL manuell eingeben..."
+            />
+          </div>
+        )}
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Text unterhalb des Videos</label>
@@ -283,7 +405,8 @@ function LessonForm({
       <div className="flex gap-3">
         <button
           type="submit"
-          className="px-5 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors"
+          disabled={uploading}
+          className="px-5 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors disabled:opacity-50"
         >
           {submitLabel}
         </button>

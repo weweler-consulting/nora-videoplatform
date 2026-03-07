@@ -24,5 +24,10 @@ if [ ! -f /app/data/.seeded ]; then
     python3 seed.py && touch /app/data/.seeded
 fi
 
+# Load custom env vars (e.g. BUNNY_API_KEY, BUNNY_LIBRARY_ID)
+if [ -f /app/data/env.sh ]; then
+    . /app/data/env.sh
+fi
+
 # Start the FastAPI application
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000

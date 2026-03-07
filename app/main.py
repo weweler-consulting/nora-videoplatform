@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from sqlalchemy import text
 from app.core.db import engine, Base
-from app.api import auth, courses, modules, sections, lessons, users, progress
+from app.api import auth, courses, modules, sections, lessons, users, progress, upload
 
 
 @asynccontextmanager
@@ -49,6 +49,7 @@ app.include_router(sections.router, prefix="/api/v1/sections", tags=["sections"]
 app.include_router(lessons.router, prefix="/api/v1/lessons", tags=["lessons"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 app.include_router(progress.router, prefix="/api/v1/progress", tags=["progress"])
+app.include_router(upload.router, prefix="/api/v1/upload", tags=["upload"])
 
 
 @app.get("/api/v1/health")

@@ -128,6 +128,18 @@ export const api = {
     request('/users/' + userId + '/enroll', { method: 'POST', body: JSON.stringify({ course_id: courseId }) }),
   removeEnrollment: (enrollmentId: string) =>
     request(`/users/enrollment/${enrollmentId}`, { method: 'DELETE' }),
+  createVideoUpload: (title: string, libraryId?: string) =>
+    request<{
+      video_id: string;
+      library_id: string;
+      tus_endpoint: string;
+      auth_signature: string;
+      auth_expiration: number;
+      embed_url: string;
+    }>('/upload/create-video', {
+      method: 'POST',
+      body: JSON.stringify({ title, library_id: libraryId }),
+    }),
   getUserProgress: (userId: string) =>
     request<UserCourseProgress[]>(`/users/${userId}/progress`),
   deleteUser: (userId: string) =>
