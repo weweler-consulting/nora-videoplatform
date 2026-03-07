@@ -80,6 +80,15 @@ class Enrollment(Base):
     course = relationship("Course", back_populates="enrollments")
 
 
+class ModuleUnlock(Base):
+    __tablename__ = "module_unlocks"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    module_id: Mapped[str] = mapped_column(String, ForeignKey("modules.id"), nullable=False)
+    unlocked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class LessonAttachment(Base):
     __tablename__ = "lesson_attachments"
 

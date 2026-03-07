@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.core.db import get_db
 from app.core.auth import get_current_user, require_admin
 from app.models.user import User
-from app.models.course import Course, Module, Section, Lesson, Enrollment, LessonProgress
+from app.models.course import Course, Module, Section, Lesson, Enrollment, LessonProgress, ModuleUnlock
 from app.schemas.course import (
     CourseCreate, CourseUpdate, CourseOut, CourseListItem, ModuleOut, SectionOut, LessonOut,
 )
@@ -25,7 +25,7 @@ async def _get_user_progress(db: AsyncSession, user_id: str) -> set[str]:
     return set(result.scalars().all())
 
 
-def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: datetime | None = None) -> CourseOut:
+def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: datetime | None = None, unlocked_module_ids: set[str] | None = None) -> CourseOut:
     modules_out = []
     total_lessons = 0
     total_completed = 0
@@ -35,7 +35,8 @@ def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: date
         # Drip content: check if module is locked
         is_locked = False
         unlocks_at = None
-        if enrolled_at and module.unlock_after_days > 0:
+        manually_unlocked = unlocked_module_ids and module.id in unlocked_module_ids
+        if not manually_unlocked and enrolled_at and module.unlock_after_days > 0:
             unlock_date = enrolled_at + timedelta(days=module.unlock_after_days)
             if now < unlock_date:
                 is_locked = True
@@ -139,8 +140,15 @@ async def get_course(course_id: str, user: User = Depends(get_current_user), db:
 
     completed_ids = await _get_user_progress(db, user.id)
     # Admin sees everything unlocked
-    enrolled_at = None if user.is_admin else enrollment.enrolled_at
-    return _build_course_out(course, completed_ids, enrolled_at=enrolled_at)
+    if user.is_admin:
+        return _build_course_out(course, completed_ids)
+
+    # Load manual unlocks for this user
+    unlocks_result = await db.execute(
+        select(ModuleUnlock.module_id).where(ModuleUnlock.user_id == user.id)
+    )
+    unlocked_module_ids = set(unlocks_result.scalars().all())
+    return _build_course_out(course, completed_ids, enrolled_at=enrollment.enrolled_at, unlocked_module_ids=unlocked_module_ids)
 
 
 # Admin endpoints

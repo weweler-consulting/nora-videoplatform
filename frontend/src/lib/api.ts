@@ -144,6 +144,10 @@ export const api = {
     request<UserCourseProgress[]>(`/users/${userId}/progress`),
   deleteUser: (userId: string) =>
     request(`/users/${userId}`, { method: 'DELETE' }),
+  unlockModule: (moduleId: string, userId: string) =>
+    request<{ ok: boolean }>(`/modules/${moduleId}/unlock/${userId}`, { method: 'POST' }),
+  lockModule: (moduleId: string, userId: string) =>
+    request<{ ok: boolean }>(`/modules/${moduleId}/unlock/${userId}`, { method: 'DELETE' }),
   uploadAttachment: (lessonId: string, file: File) => {
     const token = localStorage.getItem('token');
     const formData = new FormData();
@@ -198,6 +202,9 @@ export interface UserModuleProgress {
   title: string;
   total_lessons: number;
   completed_lessons: number;
+  is_locked: boolean;
+  manually_unlocked: boolean;
+  unlock_after_days: number;
 }
 
 export interface UserCourseProgress {

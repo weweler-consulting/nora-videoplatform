@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.core.db import get_db
 from app.core.auth import require_admin, hash_password
 from app.models.user import User
-from app.models.course import Enrollment, Course, Module, Section, Lesson, LessonProgress
+from app.models.course import Enrollment, Course, Module, Section, Lesson, LessonProgress, ModuleUnlock
 from app.core.email import send_invite_email
 
 logger = logging.getLogger(__name__)
@@ -148,6 +148,15 @@ async def get_user_progress(user_id: str, admin: User = Depends(require_admin), 
     )
     completed_ids = set(progress_result.scalars().all())
 
+    # Get manual unlocks for this user
+    unlocks_result = await db.execute(
+        select(ModuleUnlock.module_id).where(ModuleUnlock.user_id == user_id)
+    )
+    unlocked_module_ids = set(unlocks_result.scalars().all())
+
+    from datetime import datetime, timedelta
+    now = datetime.utcnow()
+
     courses_progress = []
     for enr in enrollments:
         course = enr.course
@@ -165,11 +174,23 @@ async def get_user_progress(user_id: str, admin: User = Depends(require_admin), 
                         mod_completed += 1
             total += mod_total
             completed += mod_completed
+
+            # Compute lock status
+            is_locked = False
+            manually_unlocked = module.id in unlocked_module_ids
+            if not manually_unlocked and enr.enrolled_at and module.unlock_after_days > 0:
+                unlock_date = enr.enrolled_at + timedelta(days=module.unlock_after_days)
+                if now < unlock_date:
+                    is_locked = True
+
             modules_progress.append({
                 "module_id": module.id,
                 "title": module.title,
                 "total_lessons": mod_total,
                 "completed_lessons": mod_completed,
+                "is_locked": is_locked,
+                "manually_unlocked": manually_unlocked,
+                "unlock_after_days": module.unlock_after_days,
             })
 
         courses_progress.append({

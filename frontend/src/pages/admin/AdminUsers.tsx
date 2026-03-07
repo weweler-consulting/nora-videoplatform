@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { X, UserPlus, Trash2, ShieldCheck, ShieldOff, Copy, Check } from 'lucide-react';
+import { X, UserPlus, Trash2, ShieldCheck, ShieldOff, Copy, Check, Lock, Unlock } from 'lucide-react';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserWithEnrollments[]>([]);
@@ -424,9 +424,49 @@ export default function AdminUsers() {
                                 const modPercent = mod.total_lessons > 0
                                   ? Math.round((mod.completed_lessons / mod.total_lessons) * 100)
                                   : 0;
+                                const hasDrip = mod.unlock_after_days > 0;
                                 return (
                                   <div key={mod.module_id} className="flex items-center gap-2">
-                                    <span className="text-xs text-muted-foreground truncate flex-1">{mod.title}</span>
+                                    {hasDrip && (
+                                      <button
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          if (mod.manually_unlocked) {
+                                            await api.lockModule(mod.module_id, selectedUser!.id);
+                                          } else {
+                                            await api.unlockModule(mod.module_id, selectedUser!.id);
+                                          }
+                                          const progress = await api.getUserProgress(selectedUser!.id);
+                                          setUserProgress(progress);
+                                        }}
+                                        className={`shrink-0 p-0.5 rounded transition-colors ${
+                                          mod.is_locked
+                                            ? 'text-amber-500 hover:text-green-600'
+                                            : mod.manually_unlocked
+                                              ? 'text-green-500 hover:text-amber-500'
+                                              : 'text-muted-foreground/40'
+                                        }`}
+                                        title={
+                                          mod.is_locked
+                                            ? 'Klicken zum Freischalten'
+                                            : mod.manually_unlocked
+                                              ? 'Manuell freigeschaltet — Klicken zum Sperren'
+                                              : `Automatisch offen (nach ${mod.unlock_after_days} Tagen)`
+                                        }
+                                      >
+                                        {mod.is_locked ? (
+                                          <Lock className="h-3 w-3" />
+                                        ) : (
+                                          <Unlock className="h-3 w-3" />
+                                        )}
+                                      </button>
+                                    )}
+                                    <span className={`text-xs truncate flex-1 ${mod.is_locked ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                                      {mod.title}
+                                      {mod.manually_unlocked && (
+                                        <span className="ml-1 text-[10px] text-green-500">manuell</span>
+                                      )}
+                                    </span>
                                     <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden shrink-0">
                                       <div
                                         className="h-full bg-primary/60 rounded-full"
