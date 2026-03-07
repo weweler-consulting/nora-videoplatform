@@ -80,6 +80,15 @@ class Enrollment(Base):
     course = relationship("Course", back_populates="enrollments")
 
 
+class DripNotification(Base):
+    __tablename__ = "drip_notifications"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    module_id: Mapped[str] = mapped_column(String, ForeignKey("modules.id"), nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class ModuleUnlock(Base):
     __tablename__ = "module_unlocks"
 

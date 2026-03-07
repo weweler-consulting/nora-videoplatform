@@ -85,6 +85,56 @@ def _send_smtp(config: dict, msg: MIMEMultipart):
         smtp.send_message(msg)
 
 
+def send_module_unlocked_email(
+    to_email: str,
+    to_name: str,
+    module_title: str,
+    course_title: str,
+    login_url: str,
+) -> bool:
+    """Send notification that a new module has been unlocked."""
+    config = get_smtp_config()
+    if not config:
+        return False
+
+    subject = f"Neues Modul freigeschaltet: {module_title}"
+
+    text = f"""Hallo {to_name},
+
+gute Neuigkeiten! Ein neues Modul in deinem Kurs "{course_title}" wurde freigeschaltet:
+
+{module_title}
+
+Schau gleich rein und mach weiter:
+{login_url}
+
+Liebe Gruesse
+Nora"""
+
+    html = f"""<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 500px; margin: 0 auto; padding: 32px;">
+  <h2 style="color: #d4768c; font-weight: 300; font-style: italic; margin-bottom: 24px;">Nora Weweler</h2>
+  <p>Hallo {to_name},</p>
+  <p>gute Neuigkeiten! Ein neues Modul in deinem Kurs <strong>&quot;{course_title}&quot;</strong> wurde freigeschaltet:</p>
+  <div style="background: #fdf2f4; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
+    <p style="margin: 0; font-size: 18px; font-weight: 600; color: #b85a5f;">{module_title}</p>
+  </div>
+  <div style="text-align: center; margin: 32px 0;">
+    <a href="{login_url}" style="background: #D47479; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 500;">Jetzt weitermachen</a>
+  </div>
+  <p>Liebe Gr&uuml;&szlig;e<br>Nora</p>
+</div>"""
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = config["from_addr"]
+    msg["To"] = to_email
+    msg.attach(MIMEText(text, "plain", "utf-8"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    _send_smtp(config, msg)
+    return True
+
+
 def send_password_reset_email(to_email: str, to_name: str, reset_url: str) -> bool:
     """Send password reset email. Returns True if sent."""
     config = get_smtp_config()

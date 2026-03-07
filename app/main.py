@@ -1,3 +1,4 @@
+import asyncio
 import os
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from contextlib import asynccontextmanager
 
 from sqlalchemy import text
 from app.core.db import engine, Base
+from app.core.drip_notifier import drip_notifier_loop
 from app.api import auth, courses, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook, attachments
 
 
@@ -30,7 +32,9 @@ async def lifespan(app: FastAPI):
                 await conn.execute(text(stmt))
         except Exception:
             pass  # Column already exists
+    task = asyncio.create_task(drip_notifier_loop())
     yield
+    task.cancel()
 
 
 app = FastAPI(title="Nora Videoplatform API", version="0.1.0", lifespan=lifespan)
