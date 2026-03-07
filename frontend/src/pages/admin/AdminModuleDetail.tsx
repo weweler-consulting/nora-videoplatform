@@ -402,13 +402,16 @@ function LessonForm({
         )}
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Text unterhalb des Videos</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-sm font-medium text-gray-700">Text unterhalb des Videos</label>
+          <span className="text-xs text-gray-400">Markdown wird unterstützt</span>
+        </div>
         <textarea
           value={description}
           onChange={(e) => onDescriptionChange(e.target.value)}
-          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] focus:border-transparent"
-          rows={4}
-          placeholder="Beschreibung, Zusammenfassung oder Notizen zur Lektion..."
+          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] focus:border-transparent font-mono text-sm"
+          rows={6}
+          placeholder="Markdown: **fett**, *kursiv*, ## Überschrift, - Liste, [Link](url)..."
         />
       </div>
       <div>

@@ -16,6 +16,7 @@
 - Auto-Deploy auf Push via GitHub Actions
 - Admin-Dashboard (KPIs, Kursfortschritt, inaktive Teilnehmer)
 - Stripe-Kaufflow (Payment Link → automatisch Account + Kurs + Zugangsdaten per E-Mail)
+- Datei-Downloads pro Lektion (PDFs, Rezepte, Worksheets)
 
 ## Offene Features — sortiert nach Business Impact
 
@@ -23,8 +24,7 @@
 
 | # | Feature | Impact | Aufwand |
 |---|---|---|---|
-| 1 | **Datei-Downloads pro Lektion** | Rezepte, PDFs, Worksheets — Kernfeature für Ernährungskurse. Ohne das fehlt ein Großteil des Kurs-Werts. | Klein |
-| 2 | **Rich-Text/Markdown für Lektionen** | Formatierter Text unter Videos. Macht Content sofort professioneller und wertiger. | Klein |
+| 1 | **Rich-Text/Markdown für Lektionen** | Formatierter Text unter Videos. Macht Content sofort professioneller und wertiger. | Klein |
 
 ### Retention (hält Teilnehmer dran → weniger Refunds, mehr Empfehlungen)
 
@@ -50,7 +50,6 @@
 
 ## Empfohlene Reihenfolge
 
-1. **Datei-Downloads** — schnell gebaut, hoher Produktwert
-2. **Rich-Text für Lektionen** — macht Content sofort wertiger
+1. **Rich-Text für Lektionen** — macht Content sofort wertiger
 3. **E-Mail bei Modul-Freischaltung** — aktiviert Drip richtig
 4. **E-Mail-Automationen** — Retention-Hebel

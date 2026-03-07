@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import Markdown from 'react-markdown';
 import { api, type CourseDetail, type LessonItem, type AttachmentItem } from '../lib/api';
 
 export default function LessonView() {
@@ -131,8 +132,8 @@ export default function LessonView() {
 
       {/* Description */}
       {currentLesson.description && (
-        <div className="bg-white rounded-2xl p-6 mb-6">
-          <p className="text-gray-700 whitespace-pre-wrap">{currentLesson.description}</p>
+        <div className="bg-white rounded-2xl p-6 mb-6 prose prose-gray max-w-none prose-headings:text-gray-800 prose-a:text-[var(--nora-pink-dark)] prose-strong:text-gray-800">
+          <Markdown>{currentLesson.description}</Markdown>
         </div>
       )}
 
