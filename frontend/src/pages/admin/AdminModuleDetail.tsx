@@ -106,7 +106,7 @@ export default function AdminModuleDetail() {
     <div className="p-8 max-w-4xl">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-        <Link to="/admin" className="hover:text-[var(--nora-pink-dark)] transition-colors">
+        <Link to="/admin/courses" className="hover:text-[var(--nora-pink-dark)] transition-colors">
           Kurse
         </Link>
         <span>/</span>

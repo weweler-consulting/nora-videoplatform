@@ -144,6 +144,15 @@ export const api = {
     request<UserCourseProgress[]>(`/users/${userId}/progress`),
   deleteUser: (userId: string) =>
     request(`/users/${userId}`, { method: 'DELETE' }),
+  getDashboardStats: () =>
+    request<{
+      total_users: number;
+      active_users_7d: number;
+      new_users_30d: number;
+      total_completed_courses: number;
+      courses: { course_id: string; title: string; enrolled: number; total_lessons: number; avg_progress: number; completed_count: number }[];
+      inactive_users: { id: string; name: string; email: string; last_active: string | null; completed_lessons: number; total_lessons: number; progress_percent: number }[];
+    }>('/dashboard/stats'),
   deleteVideo: (embedUrl: string) =>
     request<{ ok: boolean }>('/upload/delete-video', {
       method: 'POST',

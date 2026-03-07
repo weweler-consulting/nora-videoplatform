@@ -5,6 +5,7 @@ import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import CourseView from './pages/CourseView';
 import LessonView from './pages/LessonView';
+import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminCourses from './pages/admin/AdminCourses';
 import AdminCourseDetail from './pages/admin/AdminCourseDetail';
 import AdminModuleDetail from './pages/admin/AdminModuleDetail';
@@ -32,7 +33,8 @@ export default function App() {
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/course/:courseId" element={<CourseView />} />
                   <Route path="/course/:courseId/lesson/:lessonId" element={<LessonView />} />
-                  <Route path="/admin" element={<AdminCourses />} />
+                  <Route path="/admin" element={<AdminDashboard />} />
+                  <Route path="/admin/courses" element={<AdminCourses />} />
                   <Route path="/admin/course/:courseId" element={<AdminCourseDetail />} />
                   <Route path="/admin/course/:courseId/module/:moduleId" element={<AdminModuleDetail />} />
                   <Route path="/admin/users" element={<AdminUsers />} />
