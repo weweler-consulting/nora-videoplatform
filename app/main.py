@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 
 from sqlalchemy import text
 from app.core.db import engine, Base
-from app.api import auth, courses, modules, sections, lessons, users, progress, upload, dashboard
+from app.api import auth, courses, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook
 
 
 @asynccontextmanager
@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
         "ALTER TABLE users ADD COLUMN reset_token VARCHAR",
         "ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP",
         "ALTER TABLE modules ADD COLUMN unlock_after_days INTEGER DEFAULT 0 NOT NULL",
+        "ALTER TABLE courses ADD COLUMN stripe_product_id VARCHAR",
     ]:
         try:
             async with engine.begin() as conn:
@@ -51,6 +52,7 @@ app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 app.include_router(progress.router, prefix="/api/v1/progress", tags=["progress"])
 app.include_router(upload.router, prefix="/api/v1/upload", tags=["upload"])
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
+app.include_router(stripe_webhook.router, prefix="/api/v1/stripe", tags=["stripe"])
 
 
 @app.get("/api/v1/health")

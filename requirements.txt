@@ -7,3 +7,4 @@ pydantic[email]==2.10.3
 pydantic-settings==2.7.0
 PyJWT==2.10.1
 httpx==0.28.1
+stripe==11.4.1

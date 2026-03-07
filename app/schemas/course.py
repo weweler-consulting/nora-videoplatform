@@ -21,6 +21,7 @@ class CourseUpdate(BaseModel):
     image_url: Optional[str] = None
     is_active: Optional[bool] = None
     sort_order: Optional[int] = None
+    stripe_product_id: Optional[str] = None
 
 
 class LessonOut(BaseModel):
@@ -62,6 +63,7 @@ class CourseOut(BaseModel):
     image_url: Optional[str]
     is_active: bool
     sort_order: int
+    stripe_product_id: Optional[str] = None
     created_at: datetime
     modules: list[ModuleOut] = []
     total_lessons: int = 0

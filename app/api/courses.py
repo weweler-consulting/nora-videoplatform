@@ -81,7 +81,8 @@ def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: date
     return CourseOut(
         id=course.id, title=course.title, description=course.description,
         image_url=course.image_url, is_active=course.is_active,
-        sort_order=course.sort_order, created_at=course.created_at,
+        sort_order=course.sort_order, stripe_product_id=course.stripe_product_id,
+        created_at=course.created_at,
         modules=modules_out, total_lessons=total_lessons,
         completed_lessons=total_completed, progress_percent=progress,
     )

@@ -242,6 +242,7 @@ export interface CourseDetail {
   image_url: string | null;
   is_active: boolean;
   sort_order: number;
+  stripe_product_id: string | null;
   created_at: string;
   modules: ModuleItem[];
   total_lessons: number;

@@ -70,7 +70,7 @@ export default function AdminCourseDetail() {
         <span className="text-gray-700">{course.title}</span>
       </div>
 
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-xl font-semibold">{course.title}</h2>
           {course.description && (
@@ -84,6 +84,9 @@ export default function AdminCourseDetail() {
           + Neues Modul
         </button>
       </div>
+
+      {/* Stripe Product ID */}
+      <StripeProductInput courseId={course.id} initial={course.stripe_product_id} />
 
       {showCreate && (
         <form onSubmit={handleCreateModule} className="bg-white rounded-2xl p-6 mb-6 shadow-sm space-y-4">
@@ -170,6 +173,70 @@ export default function AdminCourseDetail() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function StripeProductInput({ courseId, initial }: { courseId: string; initial: string | null }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(initial || '');
+  const [saved, setSaved] = useState(false);
+
+  const save = async () => {
+    await api.updateCourse(courseId, { stripe_product_id: value || null });
+    setEditing(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  if (!editing && !value) {
+    return (
+      <button
+        onClick={() => setEditing(true)}
+        className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 mb-6 transition-colors"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+        </svg>
+        Stripe Product ID verknüpfen
+      </button>
+    );
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
+        <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+        </svg>
+        <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{value}</span>
+        <button onClick={() => setEditing(true)} className="text-gray-400 hover:text-gray-600">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+          </svg>
+        </button>
+        {saved && <span className="text-green-500 text-xs">Gespeichert</span>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 mb-6">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && save()}
+        className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--nora-pink)] font-mono w-72"
+        placeholder="prod_..."
+        autoFocus
+      />
+      <button onClick={save} className="px-3 py-1.5 text-sm bg-[var(--nora-pink)] text-white rounded-lg hover:bg-[var(--nora-pink-dark)] transition-colors">
+        Speichern
+      </button>
+      <button onClick={() => { setValue(initial || ''); setEditing(false); }} className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
+        Abbrechen
+      </button>
     </div>
   );
 }
