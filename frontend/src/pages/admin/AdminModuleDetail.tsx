@@ -85,7 +85,7 @@ export default function AdminModuleDetail() {
   };
 
   const handleDelete = async (lessonId: string, title: string) => {
-    if (!confirm(`Lektion "${title}" wirklich loschen?`)) return;
+    if (!confirm(`Lektion "${title}" wirklich löschen?`)) return;
     await api.deleteLesson(lessonId);
     load();
   };
@@ -206,7 +206,7 @@ export default function AdminModuleDetail() {
                         onClick={() => handleDelete(lesson.id, lesson.title)}
                         className="px-3 py-1.5 text-sm border border-red-200 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
                       >
-                        Loschen
+                        Löschen
                       </button>
                     </div>
                   </div>

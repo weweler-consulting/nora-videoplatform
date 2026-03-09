@@ -26,7 +26,7 @@ export default function AdminCourses() {
   };
 
   const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Kurs "${title}" wirklich loschen?`)) return;
+    if (!confirm(`Kurs "${title}" wirklich löschen?`)) return;
     await api.deleteCourse(id);
     load();
   };
@@ -126,7 +126,7 @@ export default function AdminCourses() {
                   onClick={() => handleDelete(course.id, course.title)}
                   className="px-3 py-1.5 text-sm border border-red-200 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
                 >
-                  Loschen
+                  Löschen
                 </button>
               </div>
             </div>
