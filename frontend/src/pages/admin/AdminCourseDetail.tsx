@@ -71,11 +71,24 @@ export default function AdminCourseDetail() {
       </div>
 
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-xl font-semibold">{course.title}</h2>
-          {course.description && (
-            <p className="text-gray-500 mt-1">{course.description}</p>
-          )}
+        <div className="flex-1 min-w-0 mr-4">
+          <EditableCourseField
+            courseId={course.id}
+            field="title"
+            value={course.title}
+            onSaved={load}
+            renderDisplay={(val) => <h2 className="text-xl font-semibold">{val}</h2>}
+            inputClassName="text-xl font-semibold w-full"
+          />
+          <EditableCourseField
+            courseId={course.id}
+            field="description"
+            value={course.description || ''}
+            onSaved={load}
+            placeholder="Beschreibung hinzufügen..."
+            renderDisplay={(val) => val ? <p className="text-gray-500 mt-1">{val}</p> : <p className="text-gray-400 mt-1 text-sm italic cursor-pointer">Beschreibung hinzufügen...</p>}
+            inputClassName="text-gray-500 w-full"
+          />
         </div>
         <button
           onClick={() => setShowCreate(!showCreate)}
@@ -237,6 +250,74 @@ function StripeProductInput({ courseId, initial }: { courseId: string; initial: 
       <button onClick={() => { setValue(initial || ''); setEditing(false); }} className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
         Abbrechen
       </button>
+    </div>
+  );
+}
+
+function EditableCourseField({
+  courseId,
+  field,
+  value,
+  onSaved,
+  placeholder,
+  renderDisplay,
+  inputClassName,
+}: {
+  courseId: string;
+  field: 'title' | 'description';
+  value: string;
+  onSaved: () => void;
+  placeholder?: string;
+  renderDisplay: (val: string) => React.ReactNode;
+  inputClassName?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  const save = async () => {
+    const trimmed = draft.trim();
+    if (field === 'title' && !trimmed) {
+      setDraft(value);
+      setEditing(false);
+      return;
+    }
+    if (trimmed !== value) {
+      await api.updateCourse(courseId, { [field]: trimmed || null });
+      onSaved();
+    }
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') save();
+          if (e.key === 'Escape') { setDraft(value); setEditing(false); }
+        }}
+        className={`px-2 py-1 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] focus:border-transparent ${inputClassName || ''}`}
+        placeholder={placeholder}
+        autoFocus
+      />
+    );
+  }
+
+  return (
+    <div
+      onClick={() => { setDraft(value); setEditing(true); }}
+      className="cursor-pointer group/edit"
+      title="Klicken zum Bearbeiten"
+    >
+      <div className="flex items-center gap-2">
+        <div className="flex-1">{renderDisplay(value)}</div>
+        <svg className="w-3.5 h-3.5 text-gray-300 group-hover/edit:text-gray-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        </svg>
+      </div>
     </div>
   );
 }
