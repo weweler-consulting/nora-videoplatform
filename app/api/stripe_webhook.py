@@ -5,10 +5,12 @@ from datetime import datetime, timedelta
 
 import stripe
 from fastapi import APIRouter, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import String, DateTime, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.db import async_session
+from app.core.db import Base, async_session
 from app.core.email import send_invite_email
 from app.models.user import User
 from app.models.course import Course, Enrollment
@@ -21,6 +23,13 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
 INVITE_TOKEN_TTL_DAYS = 7
+
+
+class StripeProcessedEvent(Base):
+    __tablename__ = "stripe_processed_events"
+
+    event_id: Mapped[str] = mapped_column(String, primary_key=True)
+    processed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 @router.post("/webhook")
@@ -38,6 +47,15 @@ async def stripe_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Invalid payload")
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
+
+    # Idempotency: claim the event ID first, skip if already processed
+    async with async_session() as db:
+        db.add(StripeProcessedEvent(event_id=event["id"]))
+        try:
+            await db.commit()
+        except IntegrityError:
+            logger.info(f"Stripe event {event['id']} already processed, skipping")
+            return {"ok": True, "duplicate": True}
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]

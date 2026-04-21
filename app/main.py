@@ -8,9 +8,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
 from sqlalchemy import text
 from app.core.db import engine, Base
 from app.core.drip_notifier import drip_notifier_loop
+from app.core.ratelimit import limiter
 from app.api import auth, courses, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook, attachments
 
 
@@ -43,6 +47,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Nora Videoplatform API", version="0.1.0", lifespan=lifespan)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 _cors_env = os.environ.get("NORA_CORS_ORIGINS", "https://kose.noraweweler.de,https://kurse.noraweweler.de")
 CORS_ORIGINS = [o.strip() for o in _cors_env.split(",") if o.strip()]

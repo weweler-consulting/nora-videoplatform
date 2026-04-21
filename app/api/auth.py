@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.core.db import get_db
 from app.core.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.core.email import send_password_reset_email
+from app.core.ratelimit import limiter
 from app.models.user import User
 from app.models.course import Enrollment
 from app.schemas.auth import (
@@ -28,7 +29,8 @@ router = APIRouter()
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
     if user and user.invite_token and not user.invite_accepted_at:
@@ -42,7 +44,8 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/register", response_model=TokenResponse)
-async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/hour")
+async def register(request: Request, data: RegisterRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == data.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
@@ -87,7 +90,8 @@ class ResetPasswordRequest(BaseModel):
 
 
 @router.post("/forgot-password")
-async def forgot_password(data: ForgotPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/hour")
+async def forgot_password(request: Request, data: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(User).where(User.email == data.email))
         user = result.scalar_one_or_none()
@@ -110,7 +114,8 @@ async def forgot_password(data: ForgotPasswordRequest, request: Request, db: Asy
 
 
 @router.post("/reset-password")
-async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/hour")
+async def reset_password(request: Request, data: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
     if len(data.new_password) < 8:
         raise HTTPException(status_code=400, detail="Passwort muss mindestens 8 Zeichen haben")
     result = await db.execute(select(User).where(User.reset_token == data.token))
@@ -150,7 +155,8 @@ async def get_invite_info(token: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/invite/accept", response_model=TokenResponse)
-async def accept_invite(data: AcceptInviteRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/hour")
+async def accept_invite(request: Request, data: AcceptInviteRequest, db: AsyncSession = Depends(get_db)):
     if not data.accept_terms:
         raise HTTPException(status_code=400, detail="AGB und Datenschutz müssen akzeptiert werden.")
     result = await db.execute(select(User).where(User.invite_token == data.token))
