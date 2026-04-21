@@ -43,6 +43,39 @@ class InviteRequest(BaseModel):
     send_email: bool = True
 
 
+@router.get("/lookup")
+async def lookup_user_by_email(
+    email: str,
+    _auth=Depends(require_admin_or_service),
+    db: AsyncSession = Depends(get_db),
+):
+    """Look up a user by email. Used by the CRM to check invite-acceptance status."""
+    result = await db.execute(
+        select(User)
+        .where(User.email == email)
+        .options(selectinload(User.enrollments))
+    )
+    user = result.unique().scalar_one_or_none()
+    if not user:
+        return {"found": False}
+    return {
+        "found": True,
+        "user_id": user.id,
+        "name": user.name,
+        "is_active": user.is_active,
+        "invite_accepted_at": user.invite_accepted_at.isoformat() if user.invite_accepted_at else None,
+        "terms_accepted_at": user.terms_accepted_at.isoformat() if user.terms_accepted_at else None,
+        "has_pending_invite": bool(user.invite_token) and not user.invite_accepted_at,
+        "enrollments": [
+            {
+                "course_id": e.course_id,
+                "enrolled_at": e.enrolled_at.isoformat() if e.enrolled_at else None,
+            }
+            for e in user.enrollments
+        ],
+    }
+
+
 @router.get("/", response_model=list[UserWithEnrollments])
 async def list_users(admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
