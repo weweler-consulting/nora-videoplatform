@@ -2,7 +2,7 @@ import logging
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,7 +59,7 @@ async def me(user: User = Depends(get_current_user)):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str
+    new_password: str = Field(min_length=8)
 
 
 class UpdateProfileRequest(BaseModel):
@@ -71,8 +71,8 @@ class UpdateProfileRequest(BaseModel):
 async def change_password(data: ChangePasswordRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     if not verify_password(data.current_password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Aktuelles Passwort ist falsch")
-    if len(data.new_password) < 6:
-        raise HTTPException(status_code=400, detail="Passwort muss mindestens 6 Zeichen haben")
+    if len(data.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Passwort muss mindestens 8 Zeichen haben")
     user.hashed_password = hash_password(data.new_password)
     return {"ok": True}
 
@@ -83,7 +83,7 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     token: str
-    new_password: str
+    new_password: str = Field(min_length=8)
 
 
 @router.post("/forgot-password")
@@ -111,8 +111,8 @@ async def forgot_password(data: ForgotPasswordRequest, request: Request, db: Asy
 
 @router.post("/reset-password")
 async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
-    if len(data.new_password) < 6:
-        raise HTTPException(status_code=400, detail="Passwort muss mindestens 6 Zeichen haben")
+    if len(data.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Passwort muss mindestens 8 Zeichen haben")
     result = await db.execute(select(User).where(User.reset_token == data.token))
     user = result.scalar_one_or_none()
     if not user or not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():

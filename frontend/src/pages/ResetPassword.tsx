@@ -16,8 +16,8 @@ export default function ResetPassword() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (password.length < 6) {
-      setError('Passwort muss mindestens 6 Zeichen haben.');
+    if (password.length < 8) {
+      setError('Passwort muss mindestens 8 Zeichen haben.');
       return;
     }
     if (password !== confirm) {
@@ -82,9 +82,9 @@ export default function ResetPassword() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={8}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] focus:border-transparent transition-all"
-                placeholder="Mindestens 6 Zeichen"
+                placeholder="Mindestens 8 Zeichen"
               />
             </div>
 

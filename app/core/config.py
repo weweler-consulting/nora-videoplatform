@@ -10,3 +10,10 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+if settings.secret_key == "change-me-in-production" or len(settings.secret_key) < 32:
+    raise RuntimeError(
+        "NORA_SECRET_KEY ist nicht sicher konfiguriert. "
+        "Setze NORA_SECRET_KEY auf einen zufaelligen Wert mit mindestens 32 Zeichen "
+        "(z.B. via `openssl rand -hex 32`)."
+    )

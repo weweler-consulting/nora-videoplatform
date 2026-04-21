@@ -44,10 +44,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Nora Videoplatform API", version="0.1.0", lifespan=lifespan)
 
+_cors_env = os.environ.get("NORA_CORS_ORIGINS", "https://kose.noraweweler.de,https://kurse.noraweweler.de")
+CORS_ORIGINS = [o.strip() for o in _cors_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
