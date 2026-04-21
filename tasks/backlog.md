@@ -6,6 +6,28 @@ Eine Liste. Hier weitermachen, wenn du Zeit hast. Erledigte Punkte abhaken, nich
 - `tasks/deep-audit.md` — vollständiger Audit nach Go-Live
 - `tasks/post-launch.md` — Security/Ops/Compliance-Themen (zum Teil hier konsolidiert)
 - `tasks/todo.md` — alter Einladungsflow-Plan (fertig)
+- `tasks/crm-integration.md` — CRM-Integration-Plan (fertig)
+
+---
+
+## 📍 Hier morgen weitermachen
+
+**Plattform-Stand:** Live auf `kose.noraweweler.de`. Go-Live-Audit durch. CRM-Anbindung an `crm.noraweweler.de` live, inkl. Status-Sync. Nächster Brocken: **B2 Zertifikat**.
+
+**Warum B2 als Nächstes:** kleinster sichtbarer Kunden-Effekt pro Aufwand. 2–3 Tage bis deploy-bar. Treiber: Social-Proof (Kundinnen teilen PDF auf Instagram → kostenlose Werbung), plus Abschluss-Motivation (niemand will bei 80 % steckenbleiben).
+
+**Konkrete erste Schritte für B2:**
+1. **PDF-Rendering-Weg wählen:** WeasyPrint (Python, HTML+CSS → PDF) vs. Playwright-Headless (mehr Overhead aber pixel-perfekt). Empfehlung: WeasyPrint, passt zum FastAPI-Stack und pip-install reicht.
+2. **Template-Entwurf:** einmaliges HTML+CSS-Layout mit Platzhaltern `{{ name }}`, `{{ course_title }}`, `{{ completed_at }}`. Nora braucht eine Unterschrift-Grafik (PNG) — vor Start von ihr anfordern.
+3. **Trigger-Punkt:** im `app/api/progress.py`-`mark_complete`: nach Speichern prüfen, ob Kurs jetzt 100 % ist (ähnlich wie Dashboard es berechnet). Wenn ja: PDF generieren + per Resend versenden.
+4. **Speicherung:** PDF in `/app/data/certificates/{user_id}/{course_id}.pdf` ablegen, später via Endpoint abrufbar (Accept-Invite-Flow hat schon den Download-Pattern mit Bearer-Auth).
+5. **DB:** minimales Feld `Certificate(user_id, course_id, issued_at, file_path)` — damit Zertifikat nicht bei jedem Re-Upload neu erzeugt wird.
+
+**Alternative falls B2 stockt:** B4 Inaktivitäts-Reminder (1–2 Tage), ist rein Backend (neuer `inactivity_loop` analog `drip_notifier_loop`), sofort sichtbare Email-Welle.
+
+**Skip für jetzt:** B1 Resume-Play braucht Player-Integration in Bunny/YouTube/Vimeo — zu breit für einen sauberen Sprint.
+
+---
 
 ---
 
@@ -122,3 +144,25 @@ CRM ↔ Kurse Integration (2026-04-21):
 - ✅ CourseInvitation-Modell + Contact-Kurse-Sektion + Historie (CRM `98dd6d1`)
 - ✅ Accept-Status-Sync (Lookup-Endpoint Kurse `9ad58bb` · Status-Pull CRM `d6f5cd3`)
 - ✅ R1 Lookup case-insensitive (Kurse `26e4a5f`) · R2 Historie-Label · R3 Copy-Link nur neueste (CRM `520e6fa`)
+
+---
+
+## Session-Notes 2026-04-21
+
+**Gestartet mit:** Frage „Können wir live?" — Audit ergab 6 Blocker, 6 hohe Bugs, 27 mittlere.
+**Am Ende:** Plattform live, CRM-Integration live, 0 Blocker, 0 hohe Bugs.
+
+**Wichtige Code-Orte, die morgen relevant sein könnten:**
+- `app/api/progress.py:mark_complete` — Einstiegspunkt für Zertifikat-Trigger
+- `app/core/drip_notifier.py:drip_notifier_loop` — Template für `inactivity_loop` (B4)
+- `app/core/email.py:_wrap_in_brand_template` + `_cta_button` — für alle neuen Mails nutzen, damit Branding konsistent bleibt
+- `requirements.txt` — wenn PDF-Lib gebraucht: dort ergänzen, wird beim Deploy automatisch installiert
+
+**Cloudron-ENV-Vars, die bereits gesetzt sind (nicht überschreiben):**
+- Kurse: `NORA_SECRET_KEY`, `RESEND_API_KEY`, `MAIL_FROM`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `BUNNY_API_KEY`, `BUNNY_LIBRARY_ID`
+- CRM: `COURSE_PLATFORM_URL`, `COURSE_PLATFORM_SERVICE_TOKEN` (für Integration — nicht anfassen)
+
+**Offen beim Kunden (Nora):**
+- Alten `admin123`-Account-Passwort ändern (Go-Live-Empfehlung)
+- Test-Student ggf. löschen
+- Unterschrift-Grafik bereitstellen, wenn B2 angefangen wird
