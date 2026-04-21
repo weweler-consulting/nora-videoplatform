@@ -32,6 +32,97 @@ def get_smtp_config() -> dict | None:
     }
 
 
+def _wrap_in_brand_template(body_html: str, unsubscribe_url: str | None = None) -> str:
+    """Wrap body HTML in the Nora Weweler brand email template."""
+    unsubscribe_footer = ""
+    if unsubscribe_url:
+        unsubscribe_footer = (
+            f'<p style="margin: 8px 0 0 0; font-size: 11px; color: #aaa; text-align: center;">'
+            f'<a href="{unsubscribe_url}" style="color: #aaa; text-decoration: underline;">Abmelden</a>'
+            f"</p>"
+        )
+
+    return f"""<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Almarai:wght@300;400;700&display=swap');
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #e3e3e3; font-family: 'Almarai', Arial, sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #e3e3e3;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background-color: #fffef5; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+          <tr>
+            <td style="background-color: #fffef5; padding: 40px 50px 30px 50px; text-align: center;">
+              <img src="https://noraweweler.de/images/nw-logo.webp" alt="Nora Weweler" width="90" style="display: block; margin: 0 auto 15px auto;">
+              <p style="margin: 0; font-size: 12px; color: #D47479; letter-spacing: 3px; text-transform: uppercase;">
+                Deine Kursplattform
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 50px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="border-bottom: 2px solid #D47479; width: 60px;"></td>
+                  <td></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 30px 50px 0 50px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="vertical-align: middle; padding-right: 18px;">
+                    <img src="https://noraweweler.de/nora-profile.001.jpeg" alt="Nora" width="70" height="70" style="border-radius: 50%; display: block; object-fit: cover;">
+                  </td>
+                  <td style="vertical-align: middle;">
+                    <p style="margin: 0; font-size: 16px; font-weight: 700; color: #303030;">Nora Weweler</p>
+                    <p style="margin: 2px 0 0 0; font-size: 13px; color: #888;">Deine Glukose Balance Mentorin</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 35px 50px 30px 50px; font-size: 15px; color: #303030; line-height: 1.8;">
+              {body_html}
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8f8f5; padding: 25px 50px; border-top: 1px solid #e3e3e3;">
+              <p style="margin: 0; font-size: 13px; color: #888; text-align: center;">
+                Nora Weweler Ern&auml;hrungsberatung<br>
+                <a href="https://www.noraweweler.de" style="color: #D47479; text-decoration: none;">www.noraweweler.de</a>
+              </p>
+              {unsubscribe_footer}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+
+def _cta_button(href: str, label: str) -> str:
+    """Primary CTA button in brand style."""
+    return (
+        f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 28px 0;">'
+        f"<tr><td align=\"center\">"
+        f'<a href="{href}" style="display: inline-block; background-color: #D47479; color: #ffffff; '
+        f"padding: 16px 45px; border-radius: 4px; text-decoration: none; font-size: 15px; "
+        f'font-weight: 700; letter-spacing: 1px; text-transform: uppercase;">{label}</a>'
+        f"</td></tr></table>"
+    )
+
+
 def send_invite_email(
     to_email: str,
     to_name: str,
@@ -60,22 +151,16 @@ Falls du diese Einladung nicht erwartet hast, kannst du diese E-Mail ignorieren.
 Liebe Gruesse
 Nora"""
 
-    html = f"""<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 500px; margin: 0 auto; padding: 32px;">
-  <div style="text-align: center; margin-bottom: 24px;">
-    <img src="https://kurse.noraweweler.de/nw-logo.webp" alt="Nora Weweler" width="64" height="64" style="width: 64px; height: 64px; margin-bottom: 8px;" />
-    <p style="font-size: 14px; font-weight: 600; color: #1f2937; margin: 0; letter-spacing: 0.025em;">Nora Weweler</p>
-  </div>
-  <p>Hallo {to_name},</p>
-  <p>du wurdest zum Kurs <strong>&quot;{course_title}&quot;</strong> eingeladen!</p>
-  <p>Um deinen Zugang zu aktivieren, klicke auf den Button unten. Dort kannst du dein Passwort festlegen und den AGB &amp; der Datenschutzerkl&auml;rung zustimmen.</p>
-  <div style="text-align: center; margin: 32px 0;">
-    <a href="{invite_url}" style="background: #D47479; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 500;">Einladung annehmen</a>
-  </div>
-  <p style="color: #888; font-size: 13px;">Der Link ist 7 Tage g&uuml;ltig.</p>
-  <p style="color: #888; font-size: 13px;">Falls der Button nicht funktioniert, kopiere diese Adresse in deinen Browser:<br><a href="{invite_url}" style="color: #d4768c; word-break: break-all;">{invite_url}</a></p>
-  <p style="color: #aaa; font-size: 12px; margin-top: 32px;">Falls du diese Einladung nicht erwartet hast, kannst du diese E-Mail ignorieren.</p>
-  <p>Liebe Gr&uuml;&szlig;e<br>Nora</p>
-</div>"""
+    body_html = f"""<p style="margin: 0 0 16px 0;">Hallo {to_name},</p>
+<p style="margin: 0 0 16px 0;">du wurdest zum Kurs <strong>&quot;{course_title}&quot;</strong> eingeladen!</p>
+<p style="margin: 0 0 8px 0;">Um deinen Zugang zu aktivieren, klicke auf den Button unten. Dort kannst du dein Passwort festlegen und den AGB &amp; der Datenschutzerkl&auml;rung zustimmen.</p>
+{_cta_button(invite_url, "Einladung annehmen")}
+<p style="margin: 0 0 8px 0; color: #888; font-size: 13px;">Der Link ist 7 Tage g&uuml;ltig.</p>
+<p style="margin: 0 0 16px 0; color: #888; font-size: 13px;">Falls der Button nicht funktioniert, kopiere diese Adresse in deinen Browser:<br><a href="{invite_url}" style="color: #D47479; word-break: break-all;">{invite_url}</a></p>
+<p style="margin: 24px 0 16px 0; color: #aaa; font-size: 12px;">Falls du diese Einladung nicht erwartet hast, kannst du diese E-Mail ignorieren.</p>
+<p style="margin: 0;">Liebe Gr&uuml;&szlig;e<br>Nora</p>"""
+
+    html = _wrap_in_brand_template(body_html)
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -129,21 +214,19 @@ Schau gleich rein und mach weiter:
 Liebe Gruesse
 Nora"""
 
-    html = f"""<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 500px; margin: 0 auto; padding: 32px;">
-  <div style="text-align: center; margin-bottom: 24px;">
-    <img src="https://kurse.noraweweler.de/nw-logo.webp" alt="Nora Weweler" width="64" height="64" style="width: 64px; height: 64px; margin-bottom: 8px;" />
-    <p style="font-size: 14px; font-weight: 600; color: #1f2937; margin: 0; letter-spacing: 0.025em;">Nora Weweler</p>
-  </div>
-  <p>Hallo {to_name},</p>
-  <p>gute Neuigkeiten! Ein neues Modul in deinem Kurs <strong>&quot;{course_title}&quot;</strong> wurde freigeschaltet:</p>
-  <div style="background: #fdf2f4; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
-    <p style="margin: 0; font-size: 18px; font-weight: 600; color: #b85a5f;">{module_title}</p>
-  </div>
-  <div style="text-align: center; margin: 32px 0;">
-    <a href="{login_url}" style="background: #D47479; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 500;">Jetzt weitermachen</a>
-  </div>
-  <p>Liebe Gr&uuml;&szlig;e<br>Nora</p>
-</div>"""
+    body_html = f"""<p style="margin: 0 0 16px 0;">Hallo {to_name},</p>
+<p style="margin: 0 0 16px 0;">gute Neuigkeiten! Ein neues Modul in deinem Kurs <strong>&quot;{course_title}&quot;</strong> wurde freigeschaltet:</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 24px 0;">
+  <tr>
+    <td style="background-color: #fdf2f4; border-radius: 6px; padding: 22px; text-align: center;">
+      <p style="margin: 0; font-size: 17px; font-weight: 700; color: #b85a5f;">{module_title}</p>
+    </td>
+  </tr>
+</table>
+{_cta_button(login_url, "Jetzt weitermachen")}
+<p style="margin: 24px 0 0 0;">Liebe Gr&uuml;&szlig;e<br>Nora</p>"""
+
+    html = _wrap_in_brand_template(body_html)
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -179,20 +262,14 @@ Falls du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.
 Liebe Grüße
 Nora"""
 
-    html = f"""<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 500px; margin: 0 auto; padding: 32px;">
-  <div style="text-align: center; margin-bottom: 24px;">
-    <img src="https://kurse.noraweweler.de/nw-logo.webp" alt="Nora Weweler" width="64" height="64" style="width: 64px; height: 64px; margin-bottom: 8px;" />
-    <p style="font-size: 14px; font-weight: 600; color: #1f2937; margin: 0; letter-spacing: 0.025em;">Nora Weweler</p>
-  </div>
-  <p>Hallo {to_name},</p>
-  <p>du hast angefordert, dein Passwort zur&uuml;ckzusetzen.</p>
-  <div style="text-align: center; margin: 32px 0;">
-    <a href="{reset_url}" style="background: #D47479; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 500;">Neues Passwort vergeben</a>
-  </div>
-  <p style="color: #888; font-size: 14px;">Der Link ist 1 Stunde g&uuml;ltig.</p>
-  <p style="color: #888; font-size: 14px;">Falls du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.</p>
-  <p>Liebe Gr&uuml;&szlig;e<br>Nora</p>
-</div>"""
+    body_html = f"""<p style="margin: 0 0 16px 0;">Hallo {to_name},</p>
+<p style="margin: 0 0 8px 0;">du hast angefordert, dein Passwort zur&uuml;ckzusetzen.</p>
+{_cta_button(reset_url, "Neues Passwort vergeben")}
+<p style="margin: 0 0 8px 0; color: #888; font-size: 13px;">Der Link ist 1 Stunde g&uuml;ltig.</p>
+<p style="margin: 24px 0 16px 0; color: #aaa; font-size: 12px;">Falls du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren.</p>
+<p style="margin: 0;">Liebe Gr&uuml;&szlig;e<br>Nora</p>"""
+
+    html = _wrap_in_brand_template(body_html)
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
