@@ -280,3 +280,46 @@ Nora"""
 
     _send_smtp(config, msg)
     return True
+
+
+def send_email_change_verification(to_email: str, to_name: str, confirm_url: str) -> bool:
+    """Send verification link for an email-address change request."""
+    config = get_smtp_config()
+    if not config:
+        return False
+
+    subject = "Bestätige deine neue E-Mail-Adresse"
+
+    text = f"""Hallo {to_name},
+
+du hast angefordert, die E-Mail-Adresse für deinen Zugang auf {to_email} zu ändern.
+
+Klicke auf den folgenden Link, um die Änderung zu bestätigen:
+
+{confirm_url}
+
+Der Link ist 1 Stunde gültig.
+
+Falls du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren — es wird nichts geändert.
+
+Liebe Grüße
+Nora"""
+
+    body_html = f"""<p style="margin: 0 0 16px 0;">Hallo {to_name},</p>
+<p style="margin: 0 0 8px 0;">du hast angefordert, die E-Mail-Adresse f&uuml;r deinen Zugang auf <strong>{to_email}</strong> zu &auml;ndern.</p>
+{_cta_button(confirm_url, "E-Mail-Adresse bestätigen")}
+<p style="margin: 0 0 8px 0; color: #888; font-size: 13px;">Der Link ist 1 Stunde g&uuml;ltig.</p>
+<p style="margin: 24px 0 16px 0; color: #aaa; font-size: 12px;">Falls du diese Anfrage nicht gestellt hast, kannst du diese E-Mail ignorieren — es wird nichts ge&auml;ndert.</p>
+<p style="margin: 0;">Liebe Gr&uuml;&szlig;e<br>Nora</p>"""
+
+    html = _wrap_in_brand_template(body_html)
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = config["from_addr"]
+    msg["To"] = to_email
+    msg.attach(MIMEText(text, "plain", "utf-8"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    _send_smtp(config, msg)
+    return True

@@ -34,3 +34,7 @@ class AcceptInviteRequest(BaseModel):
     token: str
     password: str = Field(min_length=8)
     accept_terms: bool
+
+
+class ConfirmEmailChangeRequest(BaseModel):
+    token: str

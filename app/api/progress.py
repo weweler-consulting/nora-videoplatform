@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.auth import get_current_user
+from app.core.time import utc_now
 from app.models.user import User
 from app.models.course import Enrollment, Module, Section, Lesson, LessonProgress
 
@@ -37,11 +38,11 @@ async def mark_complete(lesson_id: str, user: User = Depends(get_current_user), 
     progress = result.scalar_one_or_none()
     if progress:
         progress.completed = True
-        progress.completed_at = datetime.utcnow()
+        progress.completed_at = utc_now()
     else:
         db.add(LessonProgress(
             user_id=user.id, lesson_id=lesson_id,
-            completed=True, completed_at=datetime.utcnow(),
+            completed=True, completed_at=utc_now(),
         ))
     return {"ok": True}
 

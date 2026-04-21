@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.db import get_db
 from app.core.auth import get_current_user, require_admin
+from app.core.time import utc_now
 from app.models.user import User
 from app.models.course import Course, Module, Section, Lesson, Enrollment, LessonProgress, ModuleUnlock
 from app.schemas.course import (
@@ -29,7 +30,7 @@ def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: date
     modules_out = []
     total_lessons = 0
     total_completed = 0
-    now = datetime.utcnow()
+    now = utc_now()
 
     for module in course.modules:
         # Drip content: check if module is locked

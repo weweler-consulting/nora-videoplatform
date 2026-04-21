@@ -5,6 +5,7 @@ from sqlalchemy import String, Integer, DateTime, ForeignKey, Text, Boolean, Uni
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
+from app.core.time import utc_now
 
 
 class Course(Base):

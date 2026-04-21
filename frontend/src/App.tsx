@@ -4,6 +4,7 @@ import { isLoggedIn } from './lib/api';
 import Login from './pages/Login';
 import ResetPassword from './pages/ResetPassword';
 import AcceptInvite from './pages/AcceptInvite';
+import ConfirmEmailChange from './pages/ConfirmEmailChange';
 import Dashboard from './pages/Dashboard';
 import CourseView from './pages/CourseView';
 import LessonView from './pages/LessonView';
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/accept-invite" element={<AcceptInvite />} />
+        <Route path="/confirm-email-change" element={<ConfirmEmailChange />} />
         <Route
           path="/*"
           element={

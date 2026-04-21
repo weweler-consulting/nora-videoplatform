@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.db import get_db
 from app.core.auth import require_admin
+from app.core.time import utc_now
 from app.models.user import User
 from app.models.course import Enrollment, Course, Module, Section, Lesson, LessonProgress, ModuleUnlock
 from app.core.email import send_invite_email
@@ -75,7 +76,7 @@ async def invite_user(data: InviteRequest, request: Request, admin: User = Depen
             name=data.name,
             hashed_password="",
             invite_token=secrets.token_urlsafe(32),
-            invite_token_expires=datetime.utcnow() + timedelta(days=INVITE_TOKEN_TTL_DAYS),
+            invite_token_expires=utc_now() + timedelta(days=INVITE_TOKEN_TTL_DAYS),
         )
         db.add(user)
         await db.flush()
@@ -83,7 +84,7 @@ async def invite_user(data: InviteRequest, request: Request, admin: User = Depen
     elif not user.invite_accepted_at:
         # Existing user who hasn't accepted yet — refresh their invite token
         user.invite_token = secrets.token_urlsafe(32)
-        user.invite_token_expires = datetime.utcnow() + timedelta(days=INVITE_TOKEN_TTL_DAYS)
+        user.invite_token_expires = utc_now() + timedelta(days=INVITE_TOKEN_TTL_DAYS)
         is_pending_invite = True
         await db.flush()
 
@@ -185,7 +186,7 @@ async def get_user_progress(user_id: str, admin: User = Depends(require_admin), 
     unlocked_module_ids = set(unlocks_result.scalars().all())
 
     from datetime import datetime, timedelta
-    now = datetime.utcnow()
+    now = utc_now()
 
     courses_progress = []
     for enr in enrollments:

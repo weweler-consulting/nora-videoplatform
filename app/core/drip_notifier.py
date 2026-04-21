@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.core.db import async_session
 from app.core.email import send_module_unlocked_email
+from app.core.time import utc_now
 from app.models.user import User
 from app.models.course import Course, Module, Enrollment, DripNotification, ModuleUnlock
 
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 async def check_drip_notifications(base_url: str = "https://kurse.noraweweler.de"):
     """Check for modules that just became unlocked and send notification emails."""
-    now = datetime.utcnow()
+    now = utc_now()
 
     async with async_session() as db:
         # Get all enrollments with courses and modules
@@ -38,12 +39,14 @@ async def check_drip_notifications(base_url: str = "https://kurse.noraweweler.de
             for module in modules:
                 unlock_date = enrollment.enrolled_at + timedelta(days=module.unlock_after_days)
 
-                # Module should be unlocked now (but wasn't before — within last 2 hours buffer)
+                # Module should be unlocked now. The DripNotification dedup table
+                # guarantees we only send once per (user, module), so we can keep the
+                # look-back window wide enough to survive deploys / container restarts.
                 if unlock_date > now:
                     continue  # Still locked
 
-                if unlock_date < now - timedelta(hours=2):
-                    continue  # Unlocked more than 2 hours ago, skip (avoid sending old notifications)
+                if unlock_date < now - timedelta(hours=48):
+                    continue  # Unlocked more than 48h ago, too late for a useful notification
 
                 # Check if we already sent this notification
                 existing = await db.execute(

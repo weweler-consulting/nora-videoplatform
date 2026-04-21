@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_admin
 from app.core.db import get_db
+from app.core.time import utc_now
 from app.models.user import User
 from app.models.course import Course, Enrollment, Lesson, LessonProgress, Module, Section
 
@@ -14,7 +15,7 @@ router = APIRouter()
 
 @router.get("/stats")
 async def dashboard_stats(admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    now = datetime.utcnow()
+    now = utc_now()
     seven_days_ago = now - timedelta(days=7)
     thirty_days_ago = now - timedelta(days=30)
     fourteen_days_ago = now - timedelta(days=14)

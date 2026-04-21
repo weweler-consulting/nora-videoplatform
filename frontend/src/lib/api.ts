@@ -80,9 +80,18 @@ export const api = {
     }),
 
   updateProfile: (data: { name?: string; email?: string }) =>
-    request<{ id: string; email: string; name: string; is_admin: boolean }>('/auth/profile', {
+    request<{
+      id: string; email: string; name: string; is_admin: boolean;
+      email_change_pending: boolean; pending_email: string | null;
+    }>('/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
+    }),
+
+  confirmEmailChange: (token: string) =>
+    request<{ ok: boolean; email: string }>('/auth/confirm-email-change', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
     }),
 
   // Courses (student)

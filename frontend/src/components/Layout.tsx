@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { api, clearToken } from '../lib/api';
 
 interface UserInfo {
@@ -11,6 +11,7 @@ interface UserInfo {
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserInfo | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     api.me().then(setUser).catch(() => {
@@ -18,6 +19,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       navigate('/login');
     });
   }, [navigate]);
+
+  // Block non-admins from admin routes (A11 from audit)
+  useEffect(() => {
+    if (user && !user.is_admin && location.pathname.startsWith('/admin')) {
+      navigate('/', { replace: true });
+    }
+  }, [user, location.pathname, navigate]);
 
   const handleLogout = () => {
     clearToken();

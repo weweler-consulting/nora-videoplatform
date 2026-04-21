@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.db import get_db
+from app.core.time import utc_now
 from app.models.user import User
 
 security = HTTPBearer()
@@ -33,7 +34,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def create_access_token(user_id: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
+    expire = utc_now() + timedelta(minutes=settings.access_token_expire_minutes)
     payload = {"sub": user_id, "exp": expire}
     return jwt.encode(payload, settings.secret_key, algorithm="HS256")
 
@@ -44,6 +45,27 @@ def decode_access_token(token: str) -> Optional[str]:
         return payload.get("sub")
     except jwt.PyJWTError:
         return None
+
+
+def create_email_change_token(user_id: str, new_email: str) -> str:
+    """Short-lived token that confirms the user wants to swap their email."""
+    expire = utc_now() + timedelta(hours=1)
+    payload = {"sub": user_id, "new_email": new_email, "purpose": "email_change", "exp": expire}
+    return jwt.encode(payload, settings.secret_key, algorithm="HS256")
+
+
+def decode_email_change_token(token: str) -> Optional[tuple[str, str]]:
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
+    except jwt.PyJWTError:
+        return None
+    if payload.get("purpose") != "email_change":
+        return None
+    user_id = payload.get("sub")
+    new_email = payload.get("new_email")
+    if not user_id or not new_email:
+        return None
+    return user_id, new_email
 
 
 async def get_current_user(

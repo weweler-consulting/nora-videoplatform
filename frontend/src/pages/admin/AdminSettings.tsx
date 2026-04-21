@@ -27,8 +27,15 @@ export default function AdminSettings() {
     try {
       const updated = await api.updateProfile({ name, email });
       setName(updated.name);
+      // E-Mail wird erst geändert, wenn der User den Link in der Bestätigungs-Mail klickt
       setEmail(updated.email);
-      setProfileMsg('Profil gespeichert.');
+      if (updated.email_change_pending && updated.pending_email) {
+        setProfileMsg(
+          `Profil gespeichert. Ein Bestätigungslink wurde an ${updated.pending_email} geschickt — erst nach Klick auf den Link wird die E-Mail-Adresse wirklich geändert.`
+        );
+      } else {
+        setProfileMsg('Profil gespeichert.');
+      }
     } catch (err: any) {
       setProfileError(err.message);
     }

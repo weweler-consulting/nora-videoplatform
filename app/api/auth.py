@@ -9,9 +9,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.db import get_db
-from app.core.auth import hash_password, verify_password, create_access_token, get_current_user
-from app.core.email import send_password_reset_email
+from app.core.auth import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    create_email_change_token,
+    decode_email_change_token,
+    get_current_user,
+)
+from app.core.email import send_password_reset_email, send_email_change_verification
 from app.core.ratelimit import limiter
+from app.core.time import utc_now
 from app.models.user import User
 from app.models.course import Enrollment
 from app.schemas.auth import (
@@ -21,6 +29,7 @@ from app.schemas.auth import (
     UserResponse,
     InviteInfoResponse,
     AcceptInviteRequest,
+    ConfirmEmailChangeRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -99,7 +108,7 @@ async def forgot_password(request: Request, data: ForgotPasswordRequest, db: Asy
             return {"ok": True}
         token = secrets.token_urlsafe(32)
         user.reset_token = token
-        user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+        user.reset_token_expires = utc_now() + timedelta(hours=1)
         await db.flush()
         base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
         reset_url = f"{base}/reset-password?token={token}"
@@ -120,7 +129,7 @@ async def reset_password(request: Request, data: ResetPasswordRequest, db: Async
         raise HTTPException(status_code=400, detail="Passwort muss mindestens 8 Zeichen haben")
     result = await db.execute(select(User).where(User.reset_token == data.token))
     user = result.scalar_one_or_none()
-    if not user or not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
+    if not user or not user.reset_token_expires or user.reset_token_expires < utc_now():
         raise HTTPException(status_code=400, detail="Link ist ungültig oder abgelaufen")
     user.hashed_password = hash_password(data.new_password)
     user.reset_token = None
@@ -128,16 +137,66 @@ async def reset_password(request: Request, data: ResetPasswordRequest, db: Async
     return {"ok": True}
 
 
-@router.put("/profile", response_model=UserResponse)
-async def update_profile(data: UpdateProfileRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+@router.put("/profile")
+async def update_profile(
+    request: Request,
+    data: UpdateProfileRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     if data.name is not None:
         user.name = data.name
-    if data.email is not None:
+
+    email_change_pending = False
+    pending_email: Optional[str] = None
+    if data.email is not None and data.email != user.email:
         existing = await db.execute(select(User).where(User.email == data.email, User.id != user.id))
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=409, detail="E-Mail wird bereits verwendet")
-        user.email = data.email
-    return UserResponse(id=user.id, email=user.email, name=user.name, is_admin=user.is_admin)
+        token = create_email_change_token(user.id, data.email)
+        base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
+        confirm_url = f"{base}/confirm-email-change?token={token}"
+        try:
+            send_email_change_verification(data.email, user.name, confirm_url)
+        except Exception as e:
+            logger.error(f"Failed to send email-change verification: {e}")
+            raise HTTPException(status_code=500, detail="Konnte Bestätigungs-Mail nicht verschicken.")
+        email_change_pending = True
+        pending_email = data.email
+
+    return {
+        "id": user.id,
+        "email": user.email,
+        "name": user.name,
+        "is_admin": user.is_admin,
+        "email_change_pending": email_change_pending,
+        "pending_email": pending_email,
+    }
+
+
+@router.post("/confirm-email-change")
+@limiter.limit("10/hour")
+async def confirm_email_change(
+    request: Request,
+    data: ConfirmEmailChangeRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    decoded = decode_email_change_token(data.token)
+    if not decoded:
+        raise HTTPException(status_code=400, detail="Bestätigungslink ist ungültig oder abgelaufen.")
+    user_id, new_email = decoded
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden.")
+
+    existing = await db.execute(select(User).where(User.email == new_email, User.id != user.id))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Die E-Mail wird bereits verwendet.")
+
+    user.email = new_email
+    return {"ok": True, "email": new_email}
 
 
 @router.get("/invite/{token}", response_model=InviteInfoResponse)
@@ -148,7 +207,7 @@ async def get_invite_info(token: str, db: AsyncSession = Depends(get_db)):
         .options(selectinload(User.enrollments).selectinload(Enrollment.course))
     )
     user = result.unique().scalar_one_or_none()
-    if not user or not user.invite_token_expires or user.invite_token_expires < datetime.utcnow():
+    if not user or not user.invite_token_expires or user.invite_token_expires < utc_now():
         raise HTTPException(status_code=400, detail="Einladungslink ist ungültig oder abgelaufen.")
     course_titles = [e.course.title for e in user.enrollments if e.course is not None]
     return InviteInfoResponse(email=user.email, name=user.name, course_titles=course_titles)
@@ -161,9 +220,9 @@ async def accept_invite(request: Request, data: AcceptInviteRequest, db: AsyncSe
         raise HTTPException(status_code=400, detail="AGB und Datenschutz müssen akzeptiert werden.")
     result = await db.execute(select(User).where(User.invite_token == data.token))
     user = result.scalar_one_or_none()
-    if not user or not user.invite_token_expires or user.invite_token_expires < datetime.utcnow():
+    if not user or not user.invite_token_expires or user.invite_token_expires < utc_now():
         raise HTTPException(status_code=400, detail="Einladungslink ist ungültig oder abgelaufen.")
-    now = datetime.utcnow()
+    now = utc_now()
     user.hashed_password = hash_password(data.password)
     user.invite_token = None
     user.invite_token_expires = None

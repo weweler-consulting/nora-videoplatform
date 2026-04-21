@@ -42,14 +42,17 @@ export default function LessonView() {
 
   const handleToggleComplete = async () => {
     if (!currentLesson || !courseId) return;
-    if (currentLesson.completed) {
-      await api.uncompleteLesson(currentLesson.id);
-    } else {
-      await api.completeLesson(currentLesson.id);
+    try {
+      if (currentLesson.completed) {
+        await api.uncompleteLesson(currentLesson.id);
+      } else {
+        await api.completeLesson(currentLesson.id);
+      }
+      const updated = await api.getCourse(courseId);
+      setCourse(updated);
+    } catch (err: any) {
+      alert(err?.message || 'Fortschritt konnte nicht gespeichert werden.');
     }
-    // Refresh course data
-    const updated = await api.getCourse(courseId);
-    setCourse(updated);
   };
 
   const handleNext = () => {
