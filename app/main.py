@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from pathlib import Path
 
@@ -17,14 +18,26 @@ from app.core.drip_notifier import drip_notifier_loop
 from app.core.ratelimit import limiter
 from app.api import auth, courses, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook, attachments
 
+logger = logging.getLogger(__name__)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    # Add columns if missing (no Alembic migrations)
-    # Each in its own transaction — PostgreSQL aborts the whole txn on DDL error
-    for stmt in [
+_FK_CASCADES = [
+    ("modules", "course_id", "courses"),
+    ("sections", "module_id", "modules"),
+    ("lessons", "section_id", "sections"),
+    ("enrollments", "user_id", "users"),
+    ("enrollments", "course_id", "courses"),
+    ("drip_notifications", "user_id", "users"),
+    ("drip_notifications", "module_id", "modules"),
+    ("module_unlocks", "user_id", "users"),
+    ("module_unlocks", "module_id", "modules"),
+    ("lesson_attachments", "lesson_id", "lessons"),
+    ("lesson_progress", "user_id", "users"),
+    ("lesson_progress", "lesson_id", "lessons"),
+]
+
+
+def _build_migration_statements() -> list[str]:
+    stmts = [
         "ALTER TABLE users ADD COLUMN is_active BOOLEAN DEFAULT TRUE NOT NULL",
         "ALTER TABLE users ADD COLUMN reset_token VARCHAR",
         "ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP",
@@ -33,14 +46,47 @@ async def lifespan(app: FastAPI):
         "ALTER TABLE users ADD COLUMN invite_accepted_at TIMESTAMP",
         "ALTER TABLE users ADD COLUMN terms_accepted_at TIMESTAMP",
         "CREATE INDEX IF NOT EXISTS ix_users_invite_token ON users (invite_token)",
+        "CREATE INDEX IF NOT EXISTS ix_users_reset_token ON users (reset_token)",
         "ALTER TABLE modules ADD COLUMN unlock_after_days INTEGER DEFAULT 0 NOT NULL",
         "ALTER TABLE courses ADD COLUMN stripe_product_id VARCHAR",
-    ]:
+    ]
+    # Re-create FK constraints with ON DELETE CASCADE (A3 from audit)
+    for child, col, parent in _FK_CASCADES:
+        fk_name = f"{child}_{col}_fkey"
+        stmts.append(f'ALTER TABLE {child} DROP CONSTRAINT IF EXISTS {fk_name}')
+        stmts.append(
+            f'ALTER TABLE {child} ADD CONSTRAINT {fk_name} '
+            f'FOREIGN KEY ({col}) REFERENCES {parent}(id) ON DELETE CASCADE'
+        )
+    # Unique constraints via unique indexes (A4 from audit)
+    stmts += [
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_enrollment_user_course ON enrollments (user_id, course_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_drip_user_module ON drip_notifications (user_id, module_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_module_unlock_user_module ON module_unlocks (user_id, module_id)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_progress_user_lesson ON lesson_progress (user_id, lesson_id)",
+    ]
+    # Helpful indexes on FKs used in frequent queries
+    for child, col, _ in _FK_CASCADES:
+        stmts.append(f"CREATE INDEX IF NOT EXISTS ix_{child}_{col} ON {child} ({col})")
+    return stmts
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    # Ad-hoc migrations (no Alembic). Each in its own transaction — PostgreSQL
+    # aborts the whole txn on DDL error. Benign "already exists" errors are
+    # silently swallowed; everything else is logged so Nora sees real problems.
+    for stmt in _build_migration_statements():
         try:
             async with engine.begin() as conn:
                 await conn.execute(text(stmt))
-        except Exception:
-            pass  # Column already exists
+        except Exception as e:
+            msg = str(e).lower()
+            if "already exists" in msg or "duplicate" in msg:
+                continue
+            logger.warning(f"Migration step failed: {stmt[:100]}... — {e}")
     task = asyncio.create_task(drip_notifier_loop())
     yield
     task.cancel()

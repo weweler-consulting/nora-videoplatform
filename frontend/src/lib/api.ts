@@ -30,7 +30,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (res.status === 401) {
     clearToken();
-    window.location.href = '/login';
+    window.dispatchEvent(new CustomEvent('auth:unauthorized'));
     throw new Error('Unauthorized');
   }
 

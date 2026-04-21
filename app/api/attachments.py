@@ -1,14 +1,13 @@
-import os
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.db import get_db, async_session
-from app.core.auth import require_admin, get_current_user, decode_access_token
+from app.core.db import get_db
+from app.core.auth import require_admin, get_current_user
 from app.models.user import User
 from app.models.course import Lesson, LessonAttachment, Enrollment, Section, Module
 
@@ -64,40 +63,27 @@ async def upload_attachment(
 @router.get("/attachments/{attachment_id}/download")
 async def download_attachment(
     attachment_id: str,
-    token: str = Query(default=""),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Download with token passed as query parameter (for <a href> links)."""
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
+    """Download with standard Authorization header auth (no token in URL)."""
+    result = await db.execute(
+        select(LessonAttachment).where(LessonAttachment.id == attachment_id)
+    )
+    attachment = result.scalar_one_or_none()
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
 
-    user_id = decode_access_token(token)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    async with async_session() as db:
-        user_result = await db.execute(select(User).where(User.id == user_id))
-        user = user_result.scalar_one_or_none()
-        if not user or not user.is_active:
-            raise HTTPException(status_code=401, detail="Unauthorized")
-
-        result = await db.execute(
-            select(LessonAttachment).where(LessonAttachment.id == attachment_id)
+    if not user.is_admin:
+        enrolled = await db.execute(
+            select(Enrollment)
+            .join(Module, Module.course_id == Enrollment.course_id)
+            .join(Section, Section.module_id == Module.id)
+            .join(Lesson, Lesson.section_id == Section.id)
+            .where(Lesson.id == attachment.lesson_id, Enrollment.user_id == user.id)
         )
-        attachment = result.scalar_one_or_none()
-        if not attachment:
-            raise HTTPException(status_code=404, detail="Attachment not found")
-
-        # Check enrollment (admin can always download)
-        if not user.is_admin:
-            enrolled = await db.execute(
-                select(Enrollment)
-                .join(Module, Module.course_id == Enrollment.course_id)
-                .join(Section, Section.module_id == Module.id)
-                .join(Lesson, Lesson.section_id == Section.id)
-                .where(Lesson.id == attachment.lesson_id, Enrollment.user_id == user.id)
-            )
-            if not enrolled.scalar_one_or_none():
-                raise HTTPException(status_code=403, detail="Not enrolled")
+        if not enrolled.scalar_one_or_none():
+            raise HTTPException(status_code=403, detail="Not enrolled")
 
     file_path = FILES_DIR / attachment.filename
     if not file_path.exists():

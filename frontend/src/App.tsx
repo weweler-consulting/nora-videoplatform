@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { isLoggedIn } from './lib/api';
 import Login from './pages/Login';
 import ResetPassword from './pages/ResetPassword';
@@ -19,9 +20,20 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AuthEventBridge() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const handler = () => navigate('/login', { replace: true, state: { sessionExpired: true } });
+    window.addEventListener('auth:unauthorized', handler);
+    return () => window.removeEventListener('auth:unauthorized', handler);
+  }, [navigate]);
+  return null;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <AuthEventBridge />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api, setToken } from '../lib/api';
 
 export default function Login() {
@@ -12,6 +12,8 @@ export default function Login() {
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const sessionExpired = (location.state as { sessionExpired?: boolean } | null)?.sessionExpired;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +111,11 @@ export default function Login() {
           )
         ) : (
           <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-8 space-y-5">
+            {sessionExpired && !error && (
+              <div className="bg-amber-50 text-amber-700 text-sm px-4 py-3 rounded-lg">
+                Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.
+              </div>
+            )}
             {error && (
               <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg">
                 {error}

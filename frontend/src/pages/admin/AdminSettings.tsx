@@ -39,16 +39,16 @@ export default function AdminSettings() {
     setPwMsg('');
     setPwError('');
     if (newPw !== confirmPw) {
-      setPwError('Passworter stimmen nicht uberein.');
+      setPwError('Passwörter stimmen nicht überein.');
       return;
     }
-    if (newPw.length < 6) {
-      setPwError('Passwort muss mindestens 6 Zeichen haben.');
+    if (newPw.length < 8) {
+      setPwError('Passwort muss mindestens 8 Zeichen haben.');
       return;
     }
     try {
       await api.changePassword(currentPw, newPw);
-      setPwMsg('Passwort geandert.');
+      setPwMsg('Passwort geändert.');
       setCurrentPw('');
       setNewPw('');
       setConfirmPw('');

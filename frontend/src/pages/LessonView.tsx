@@ -58,6 +58,30 @@ export default function LessonView() {
     }
   };
 
+  const handleDownloadAttachment = async (attachmentId: string, filename: string) => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`/api/v1/attachments/${attachmentId}/download`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        alert('Download fehlgeschlagen.');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Download fehlgeschlagen.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -156,17 +180,18 @@ export default function LessonView() {
           </h3>
           <div className="space-y-2">
             {attachments.map((a) => (
-              <a
+              <button
                 key={a.id}
-                href={`/api/v1/attachments/${a.id}/download?token=${localStorage.getItem('token') || ''}`}
-                className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg hover:bg-[var(--nora-pink-light)] transition-colors group"
+                type="button"
+                onClick={() => handleDownloadAttachment(a.id, a.original_filename)}
+                className="w-full text-left flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg hover:bg-[var(--nora-pink-light)] transition-colors group"
               >
                 <svg className="w-5 h-5 text-gray-400 group-hover:text-[var(--nora-pink-dark)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
                 <span className="text-sm text-gray-700 group-hover:text-[var(--nora-pink-dark)] flex-1">{a.original_filename}</span>
                 <span className="text-xs text-gray-400">{(a.file_size / 1024).toFixed(0)} KB</span>
-              </a>
+              </button>
             ))}
           </div>
         </div>
