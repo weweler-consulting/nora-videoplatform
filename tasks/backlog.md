@@ -43,6 +43,14 @@ Was aus PM-Sicht direkt Umsatz oder Retention bringt. Reihenfolge ist meine Empf
 
 ---
 
+## 🔗 CRM-Integration — Folge-Hygiene (aus Review 2026-04-21)
+
+- [ ] **R4 · Doppelter API-Call beim Einladen** — `nora-crm/src/lib/actions/courseInvite.ts:94`. `inviteContactToCourseAction` ruft `listCourses()` für den Title und dann `inviteContactToCourse()`. Zwei Roundtrips. Fix: Kurse-API `POST /users/invite` zusätzlich `course_title` zurückgeben lassen oder vom Frontend mitschicken.
+- [ ] **R5 · Doppelklick → IntegrityError bei Enrollment** — selten, aber bei Force-Refresh während `sending=true` möglich. Der Unique-Constraint auf `(user_id, course_id)` feuert im Kurse-Backend und gibt 500 zurück. Fix: IntegrityError im `invite_user`-Endpoint abfangen und idempotent als „bereits eingeschrieben" behandeln.
+- [ ] **R6 · E-Mail-Änderung im CRM desyncht Status** — Nach Edit der Contact-Email zeigt der Kurs-Lookup dauerhaft „Offen" weil er auf der alten Email in der Kurse-DB liegt. Lösung A: Warn-Dialog im Profil-Edit. Lösung B: automatischer Sync an Kurse-API (aber die Kurse-Seite hat jetzt Verification-Flow, die Email kann nicht stillschweigend geändert werden).
+- [ ] **R7 · Gelöschter Kurs → fälschlich „Offen"** — Wenn ein Kurs in der Kurse-App gelöscht wird, cascade-löscht das `Enrollment`, und der CRM-Lookup findet es nicht mehr → Badge dauerhaft „Offen". Randfall, niedrige Priorität. Fix: Löschung weicher machen (`is_archived` flag statt hartes Delete) ODER im CRM-Lookup einen „Kurs existiert nicht mehr"-State einführen.
+- [ ] **R8 · Stripe-Direktkäufe unsichtbar im CRM** — Wenn Kontakt direkt via Stripe kauft (kein CRM-Invite), hat die „Kurse"-Sektion im CRM keinen Eintrag, obwohl der Kunde Zugang hat. Fix: die Sektion sollte auch die `enrollments` aus dem Lookup anzeigen, nicht nur CRM-getriggerte Invitations. Synthetische „Historie"-Zeilen mit Typ „Direkt gekauft".
+
 ## 🟢 Bugs/Hygiene — Niedrig
 
 - [ ] **A22 · `title/description` ohne `min_length`** — `app/schemas/course.py`. Leere Kurse möglich.
@@ -108,3 +116,9 @@ Go-Live-Block (vor 2026-04-21):
 Deep-Audit-Block (2026-04-21):
 - ✅ A1 Progress-Enrollment-Check, A2 JWT-raus-aus-URL, A3 FK-Cascades, A4 Unique-Constraints, A5 Auto-Logout ohne Reload, A6 Passwort-Min 8 überall (`6f3137e`)
 - ✅ A7 handleToggleComplete error-handling, A8 Stripe-Refund-Handler, A9 E-Mail-Verification-Flow, A10 Drip-Buffer 48h, A11 Frontend-Admin-Route-Block, A12 `datetime.utcnow` → `utc_now` (`9fc632f`)
+
+CRM ↔ Kurse Integration (2026-04-21):
+- ✅ Service-Token-API + Admin-UI (Kurse `e900b5f`)
+- ✅ CourseInvitation-Modell + Contact-Kurse-Sektion + Historie (CRM `98dd6d1`)
+- ✅ Accept-Status-Sync (Lookup-Endpoint Kurse `9ad58bb` · Status-Pull CRM `d6f5cd3`)
+- ✅ R1 Lookup case-insensitive (Kurse `26e4a5f`) · R2 Historie-Label · R3 Copy-Link nur neueste (CRM `520e6fa`)
