@@ -4,13 +4,12 @@
     "author": "Justus Weweler <justus@kideon.de>",
     "description": "Video-Kursplattform fuer noraweweler.de",
     "tagline": "Online-Kurse",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "healthCheckPath": "/api/v1/health",
     "httpPort": 8000,
     "addons": {
         "localstorage": {},
-        "postgresql": {},
-        "sendmail": {}
+        "postgresql": {}
     },
     "manifestVersion": 2,
     "website": "https://noraweweler.de",
