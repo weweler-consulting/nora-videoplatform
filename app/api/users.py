@@ -49,10 +49,16 @@ async def lookup_user_by_email(
     _auth=Depends(require_admin_or_service),
     db: AsyncSession = Depends(get_db),
 ):
-    """Look up a user by email. Used by the CRM to check invite-acceptance status."""
+    """Look up a user by email. Used by the CRM to check invite-acceptance status.
+
+    Email comparison is case-insensitive — both systems may have stored the
+    same address with different casing (Stripe, manual entry, etc.).
+    """
+    from sqlalchemy import func
+    normalized = email.strip().lower()
     result = await db.execute(
         select(User)
-        .where(User.email == email)
+        .where(func.lower(User.email) == normalized)
         .options(selectinload(User.enrollments))
     )
     user = result.unique().scalar_one_or_none()
