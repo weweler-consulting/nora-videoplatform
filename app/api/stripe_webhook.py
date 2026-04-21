@@ -1,7 +1,7 @@
 import logging
 import os
 import secrets
-import string
+from datetime import datetime, timedelta
 
 import stripe
 from fastapi import APIRouter, HTTPException, Request
@@ -9,7 +9,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import async_session
-from app.core.auth import hash_password
 from app.core.email import send_invite_email
 from app.models.user import User
 from app.models.course import Course, Enrollment
@@ -21,10 +20,7 @@ router = APIRouter()
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
-
-def _generate_password(length: int = 10) -> str:
-    chars = string.ascii_letters + string.digits
-    return "".join(secrets.choice(chars) for _ in range(length))
+INVITE_TOKEN_TTL_DAYS = 7
 
 
 @router.post("/webhook")
@@ -88,19 +84,24 @@ async def _handle_checkout_completed(session: dict, request: Request):
         user_result = await db.execute(select(User).where(User.email == customer_email))
         user = user_result.scalar_one_or_none()
 
-        password = _generate_password()
-        is_new_user = user is None
-
+        needs_invite = False
         if not user:
-            # Split name into parts, use email prefix as fallback
             name = customer_name or customer_email.split("@")[0]
             user = User(
                 email=customer_email,
                 name=name,
-                hashed_password=hash_password(password),
+                hashed_password="",
+                invite_token=secrets.token_urlsafe(32),
+                invite_token_expires=datetime.utcnow() + timedelta(days=INVITE_TOKEN_TTL_DAYS),
             )
             db.add(user)
             await db.flush()
+            needs_invite = True
+        elif not user.invite_accepted_at:
+            # User stuck with an unaccepted invite — refresh token, resend
+            user.invite_token = secrets.token_urlsafe(32)
+            user.invite_token_expires = datetime.utcnow() + timedelta(days=INVITE_TOKEN_TTL_DAYS)
+            needs_invite = True
 
         # Enroll in each matched course
         enrolled_courses = []
@@ -117,15 +118,14 @@ async def _handle_checkout_completed(session: dict, request: Request):
 
         await db.commit()
 
-        # Send invite email for new users
-        if is_new_user and enrolled_courses:
+        if needs_invite and enrolled_courses:
             base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
-            login_url = f"{base}/login"
+            invite_url = f"{base}/accept-invite?token={user.invite_token}"
             course_titles = ", ".join(c.title for c in enrolled_courses)
             try:
-                send_invite_email(customer_email, user.name, course_titles, password, login_url)
+                send_invite_email(customer_email, user.name, course_titles, invite_url)
                 logger.info(f"Invite email sent to {customer_email} for courses: {course_titles}")
             except Exception as e:
                 logger.error(f"Failed to send invite email to {customer_email}: {e}")
-        elif not is_new_user and enrolled_courses:
+        elif not needs_invite and enrolled_courses:
             logger.info(f"Existing user {customer_email} enrolled in: {[c.title for c in enrolled_courses]}")

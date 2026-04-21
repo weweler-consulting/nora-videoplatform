@@ -18,6 +18,10 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     reset_token: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     reset_token_expires: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    invite_token: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
+    invite_token_expires: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    invite_accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    terms_accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     enrollments = relationship("Enrollment", back_populates="user", cascade="all, delete-orphan")

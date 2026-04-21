@@ -36,27 +36,26 @@ def send_invite_email(
     to_email: str,
     to_name: str,
     course_title: str,
-    password: str,
-    login_url: str,
+    invite_url: str,
 ) -> bool:
-    """Send invite email. Returns True if sent, False if SMTP not configured."""
+    """Send invite email with accept-invite link. Returns True if sent, False if SMTP not configured."""
     config = get_smtp_config()
     if not config:
         return False
 
-    subject = f"Dein Zugang zum Kurs \"{course_title}\""
+    subject = f"Einladung zum Kurs \"{course_title}\""
 
     text = f"""Hallo {to_name},
 
-du hast Zugang zum Kurs "{course_title}" erhalten!
+du wurdest zum Kurs "{course_title}" eingeladen!
 
-Hier sind deine Zugangsdaten:
+Um deinen Zugang zu aktivieren, klicke bitte auf den folgenden Link. Dort kannst du dein Passwort festlegen und den AGB sowie der Datenschutzerklaerung zustimmen:
 
-Link: {login_url}
-E-Mail: {to_email}
-Passwort: {password}
+{invite_url}
 
-Bitte aendere dein Passwort nach dem ersten Login unter Einstellungen.
+Der Link ist 7 Tage gueltig.
+
+Falls du diese Einladung nicht erwartet hast, kannst du diese E-Mail ignorieren.
 
 Liebe Gruesse
 Nora"""
@@ -67,13 +66,14 @@ Nora"""
     <p style="font-size: 14px; font-weight: 600; color: #1f2937; margin: 0; letter-spacing: 0.025em;">Nora Weweler</p>
   </div>
   <p>Hallo {to_name},</p>
-  <p>du hast Zugang zum Kurs <strong>"{course_title}"</strong> erhalten!</p>
-  <div style="background: #fdf2f4; border-radius: 12px; padding: 20px; margin: 24px 0;">
-    <p style="margin: 0 0 8px;"><strong>Link:</strong> <a href="{login_url}" style="color: #d4768c;">{login_url}</a></p>
-    <p style="margin: 0 0 8px;"><strong>E-Mail:</strong> {to_email}</p>
-    <p style="margin: 0;"><strong>Passwort:</strong> {password}</p>
+  <p>du wurdest zum Kurs <strong>&quot;{course_title}&quot;</strong> eingeladen!</p>
+  <p>Um deinen Zugang zu aktivieren, klicke auf den Button unten. Dort kannst du dein Passwort festlegen und den AGB &amp; der Datenschutzerkl&auml;rung zustimmen.</p>
+  <div style="text-align: center; margin: 32px 0;">
+    <a href="{invite_url}" style="background: #D47479; color: white; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 500;">Einladung annehmen</a>
   </div>
-  <p style="color: #888; font-size: 14px;">Bitte &auml;ndere dein Passwort nach dem ersten Login unter Einstellungen.</p>
+  <p style="color: #888; font-size: 13px;">Der Link ist 7 Tage g&uuml;ltig.</p>
+  <p style="color: #888; font-size: 13px;">Falls der Button nicht funktioniert, kopiere diese Adresse in deinen Browser:<br><a href="{invite_url}" style="color: #d4768c; word-break: break-all;">{invite_url}</a></p>
+  <p style="color: #aaa; font-size: 12px; margin-top: 32px;">Falls du diese Einladung nicht erwartet hast, kannst du diese E-Mail ignorieren.</p>
   <p>Liebe Gr&uuml;&szlig;e<br>Nora</p>
 </div>"""
 

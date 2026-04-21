@@ -6,12 +6,21 @@ from pydantic import BaseModel, EmailStr
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.db import get_db
 from app.core.auth import hash_password, verify_password, create_access_token, get_current_user
 from app.core.email import send_password_reset_email
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
+from app.models.course import Enrollment
+from app.schemas.auth import (
+    LoginRequest,
+    RegisterRequest,
+    TokenResponse,
+    UserResponse,
+    InviteInfoResponse,
+    AcceptInviteRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +31,12 @@ router = APIRouter()
 async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
-    if not user or not verify_password(data.password, user.hashed_password):
+    if user and user.invite_token and not user.invite_accepted_at:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Einladung noch nicht bestätigt. Bitte prüfe dein E-Mail-Postfach.",
+        )
+    if not user or not user.hashed_password or not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     return TokenResponse(access_token=create_access_token(user.id))
 
@@ -119,3 +133,36 @@ async def update_profile(data: UpdateProfileRequest, user: User = Depends(get_cu
             raise HTTPException(status_code=409, detail="E-Mail wird bereits verwendet")
         user.email = data.email
     return UserResponse(id=user.id, email=user.email, name=user.name, is_admin=user.is_admin)
+
+
+@router.get("/invite/{token}", response_model=InviteInfoResponse)
+async def get_invite_info(token: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(User)
+        .where(User.invite_token == token)
+        .options(selectinload(User.enrollments).selectinload(Enrollment.course))
+    )
+    user = result.unique().scalar_one_or_none()
+    if not user or not user.invite_token_expires or user.invite_token_expires < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Einladungslink ist ungültig oder abgelaufen.")
+    course_titles = [e.course.title for e in user.enrollments if e.course is not None]
+    return InviteInfoResponse(email=user.email, name=user.name, course_titles=course_titles)
+
+
+@router.post("/invite/accept", response_model=TokenResponse)
+async def accept_invite(data: AcceptInviteRequest, db: AsyncSession = Depends(get_db)):
+    if not data.accept_terms:
+        raise HTTPException(status_code=400, detail="AGB und Datenschutz müssen akzeptiert werden.")
+    result = await db.execute(select(User).where(User.invite_token == data.token))
+    user = result.scalar_one_or_none()
+    if not user or not user.invite_token_expires or user.invite_token_expires < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Einladungslink ist ungültig oder abgelaufen.")
+    now = datetime.utcnow()
+    user.hashed_password = hash_password(data.password)
+    user.invite_token = None
+    user.invite_token_expires = None
+    user.invite_accepted_at = now
+    user.terms_accepted_at = now
+    user.is_active = True
+    await db.flush()
+    return TokenResponse(access_token=create_access_token(user.id))

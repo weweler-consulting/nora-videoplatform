@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class LoginRequest(BaseModel):
@@ -9,7 +9,7 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     email: EmailStr
     name: str
-    password: str
+    password: str = Field(min_length=8)
 
 
 class TokenResponse(BaseModel):
@@ -22,3 +22,15 @@ class UserResponse(BaseModel):
     email: str
     name: str
     is_admin: bool
+
+
+class InviteInfoResponse(BaseModel):
+    email: str
+    name: str
+    course_titles: list[str]
+
+
+class AcceptInviteRequest(BaseModel):
+    token: str
+    password: str = Field(min_length=8)
+    accept_terms: bool

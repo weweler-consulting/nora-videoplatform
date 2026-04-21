@@ -15,11 +15,10 @@ export default function AdminUsers() {
   const [showInvite, setShowInvite] = useState(false);
   const [invEmail, setInvEmail] = useState('');
   const [invName, setInvName] = useState('');
-  const [invPassword, setInvPassword] = useState('');
   const [invCourseId, setInvCourseId] = useState('');
   const [invError, setInvError] = useState('');
-  const [invSendEmail, setInvSendEmail] = useState(false);
-  const [inviteResult, setInviteResult] = useState<{ name: string; email: string; password: string; courseTitle: string; emailSent: boolean } | null>(null);
+  const [invSendEmail, setInvSendEmail] = useState(true);
+  const [inviteResult, setInviteResult] = useState<{ name: string; email: string; courseTitle: string; emailSent: boolean; inviteUrl: string | null; pendingInvite: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
   const [filterCourseId, setFilterCourseId] = useState('');
 
@@ -61,17 +60,23 @@ export default function AdminUsers() {
       setInvError('Bitte alle Felder ausfüllen.');
       return;
     }
-    const password = invPassword || 'changeme123';
     const courseTitle = courses.find((c) => c.id === invCourseId)?.title || '';
     try {
       const result = await api.inviteUser({
         email: invEmail, name: invName, course_id: invCourseId,
-        password: invPassword || undefined, send_email: invSendEmail,
+        send_email: invSendEmail,
       });
-      setInviteResult({ name: invName, email: invEmail, password, courseTitle, emailSent: result.email_sent });
+      setInviteResult({
+        name: invName,
+        email: invEmail,
+        courseTitle,
+        emailSent: result.email_sent,
+        inviteUrl: result.invite_url,
+        pendingInvite: result.pending_invite,
+      });
       setCopied(false);
-      setInvEmail(''); setInvName(''); setInvPassword(''); setInvCourseId('');
-      setInvSendEmail(false); setShowInvite(false);
+      setInvEmail(''); setInvName(''); setInvCourseId('');
+      setInvSendEmail(true); setShowInvite(false);
       load();
     } catch (err: any) {
       setInvError(err.message || 'Fehler beim Einladen.');
@@ -174,25 +179,22 @@ export default function AdminUsers() {
                   <Input type="email" value={invEmail} onChange={(e) => setInvEmail(e.target.value)} placeholder="nutzer@email.de" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Passwort</label>
-                  <Input value={invPassword} onChange={(e) => setInvPassword(e.target.value)} placeholder="Standard: changeme123" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Kurs</label>
-                  <select
-                    value={invCourseId}
-                    onChange={(e) => setInvCourseId(e.target.value)}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="">Kurs wählen...</option>
-                    {courses.map((c) => (
-                      <option key={c.id} value={c.id}>{c.title}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Kurs</label>
+                <select
+                  value={invCourseId}
+                  onChange={(e) => setInvCourseId(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="">Kurs wählen...</option>
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>{c.title}</option>
+                  ))}
+                </select>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Die Teilnehmerin erhält einen Einladungslink per E-Mail. Sie legt dort ihr eigenes Passwort fest und bestätigt AGB &amp; Datenschutz.
+              </p>
               <div className="flex items-center justify-between pt-1">
                 <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
                   <input
@@ -221,28 +223,42 @@ export default function AdminUsers() {
           <CardContent className="pt-5">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <Badge variant="success">Einladung erstellt</Badge>
+                <Badge variant="success">
+                  {inviteResult.pendingInvite ? 'Einladung erstellt' : 'Kurs hinzugefügt'}
+                </Badge>
                 {inviteResult.emailSent && <Badge variant="success">E-Mail gesendet</Badge>}
               </div>
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setInviteResult(null)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <div className="bg-white rounded-md p-3 text-sm text-muted-foreground whitespace-pre-line font-mono leading-relaxed border">
-              {`Hallo ${inviteResult.name},\n\ndu hast Zugang zum Kurs "${inviteResult.courseTitle}" erhalten!\n\nHier sind deine Zugangsdaten:\n\nLink: ${window.location.origin}/login\nE-Mail: ${inviteResult.email}\nPasswort: ${inviteResult.password}\n\nBitte ändere dein Passwort nach dem ersten Login.\n\nLiebe Grüße\nNora`}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-2"
-              onClick={() => {
-                const text = `Hallo ${inviteResult.name},\n\ndu hast Zugang zum Kurs "${inviteResult.courseTitle}" erhalten!\n\nHier sind deine Zugangsdaten:\n\nLink: ${window.location.origin}/login\nE-Mail: ${inviteResult.email}\nPasswort: ${inviteResult.password}\n\nBitte ändere dein Passwort nach dem ersten Login.\n\nLiebe Grüße\nNora`;
-                navigator.clipboard.writeText(text.replace(/\\n/g, '\n'));
-                setCopied(true);
-              }}
-            >
-              {copied ? <><Check className="h-3.5 w-3.5" /> Kopiert!</> : <><Copy className="h-3.5 w-3.5" /> Nachricht kopieren</>}
-            </Button>
+            {inviteResult.pendingInvite && inviteResult.inviteUrl ? (
+              <>
+                <p className="text-sm text-muted-foreground mb-2">
+                  {inviteResult.emailSent
+                    ? `${inviteResult.name} (${inviteResult.email}) hat den Einladungslink für „${inviteResult.courseTitle}" per E-Mail erhalten. Der Link ist 7 Tage gültig.`
+                    : `Teile diesen Link mit ${inviteResult.name}, um den Zugang zu „${inviteResult.courseTitle}" zu aktivieren. Der Link ist 7 Tage gültig.`}
+                </p>
+                <div className="bg-white rounded-md p-3 text-xs text-muted-foreground font-mono leading-relaxed border break-all">
+                  {inviteResult.inviteUrl}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => {
+                    navigator.clipboard.writeText(inviteResult.inviteUrl!);
+                    setCopied(true);
+                  }}
+                >
+                  {copied ? <><Check className="h-3.5 w-3.5" /> Kopiert!</> : <><Copy className="h-3.5 w-3.5" /> Link kopieren</>}
+                </Button>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {inviteResult.name} ist bereits aktivierte Teilnehmerin und wurde zum Kurs „{inviteResult.courseTitle}" hinzugefügt.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

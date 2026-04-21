@@ -1,4 +1,6 @@
 import logging
+import secrets
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr
@@ -7,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.db import get_db
-from app.core.auth import require_admin, hash_password
+from app.core.auth import require_admin
 from app.models.user import User
 from app.models.course import Enrollment, Course, Module, Section, Lesson, LessonProgress, ModuleUnlock
 from app.core.email import send_invite_email
@@ -15,6 +17,13 @@ from app.core.email import send_invite_email
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+INVITE_TOKEN_TTL_DAYS = 7
+
+
+def _build_invite_url(request: Request, token: str) -> str:
+    base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
+    return f"{base}/accept-invite?token={token}"
 
 
 class UserWithEnrollments(BaseModel):
@@ -30,8 +39,7 @@ class InviteRequest(BaseModel):
     email: EmailStr
     name: str
     course_id: str
-    password: str = "changeme123"
-    send_email: bool = False
+    send_email: bool = True
 
 
 @router.get("/", response_model=list[UserWithEnrollments])
@@ -58,9 +66,25 @@ async def list_users(admin: User = Depends(require_admin), db: AsyncSession = De
 async def invite_user(data: InviteRequest, request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
+
+    is_pending_invite = False
     if not user:
-        user = User(email=data.email, name=data.name, hashed_password=hash_password(data.password))
+        # Brand-new user: create with empty password + fresh invite token
+        user = User(
+            email=data.email,
+            name=data.name,
+            hashed_password="",
+            invite_token=secrets.token_urlsafe(32),
+            invite_token_expires=datetime.utcnow() + timedelta(days=INVITE_TOKEN_TTL_DAYS),
+        )
         db.add(user)
+        await db.flush()
+        is_pending_invite = True
+    elif not user.invite_accepted_at:
+        # Existing user who hasn't accepted yet — refresh their invite token
+        user.invite_token = secrets.token_urlsafe(32)
+        user.invite_token_expires = datetime.utcnow() + timedelta(days=INVITE_TOKEN_TTL_DAYS)
+        is_pending_invite = True
         await db.flush()
 
     existing = await db.execute(
@@ -69,20 +93,26 @@ async def invite_user(data: InviteRequest, request: Request, admin: User = Depen
     if not existing.scalar_one_or_none():
         db.add(Enrollment(user_id=user.id, course_id=data.course_id))
 
-    # Send invite email if requested
+    course_result = await db.execute(select(Course).where(Course.id == data.course_id))
+    course = course_result.scalar_one_or_none()
+    course_title = course.title if course else "Kurs"
+
+    invite_url = _build_invite_url(request, user.invite_token) if is_pending_invite and user.invite_token else None
+
     email_sent = False
-    if data.send_email:
-        course_result = await db.execute(select(Course).where(Course.id == data.course_id))
-        course = course_result.scalar_one_or_none()
-        course_title = course.title if course else "Kurs"
-        base = str(request.base_url).rstrip("/")
-        login_url = base.replace("http://", "https://", 1) + "/login"
+    if data.send_email and is_pending_invite and invite_url:
         try:
-            email_sent = send_invite_email(data.email, data.name, course_title, data.password, login_url)
+            email_sent = send_invite_email(data.email, data.name, course_title, invite_url)
         except Exception as e:
             logger.error(f"Failed to send invite email: {e}")
 
-    return {"user_id": user.id, "enrolled": True, "email_sent": email_sent}
+    return {
+        "user_id": user.id,
+        "enrolled": True,
+        "email_sent": email_sent,
+        "invite_url": invite_url,
+        "pending_invite": is_pending_invite,
+    }
 
 
 @router.post("/{user_id}/enroll")

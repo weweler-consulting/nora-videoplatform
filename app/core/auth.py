@@ -25,6 +25,8 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    if not hashed_password or "$" not in hashed_password:
+        return False
     salt, hash_hex = hashed_password.split("$", 1)
     h = hashlib.pbkdf2_hmac("sha256", plain_password.encode(), salt.encode(), 100_000)
     return hmac.compare_digest(h.hex(), hash_hex)

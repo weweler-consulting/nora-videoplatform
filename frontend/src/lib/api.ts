@@ -70,6 +70,15 @@ export const api = {
       body: JSON.stringify({ token, new_password: newPassword }),
     }),
 
+  getInvite: (token: string) =>
+    request<{ email: string; name: string; course_titles: string[] }>(`/auth/invite/${token}`),
+
+  acceptInvite: (token: string, password: string, acceptTerms: boolean) =>
+    request<{ access_token: string }>('/auth/invite/accept', {
+      method: 'POST',
+      body: JSON.stringify({ token, password, accept_terms: acceptTerms }),
+    }),
+
   updateProfile: (data: { name?: string; email?: string }) =>
     request<{ id: string; email: string; name: string; is_admin: boolean }>('/auth/profile', {
       method: 'PUT',
@@ -120,8 +129,8 @@ export const api = {
     request(`/lessons/${id}`, { method: 'DELETE' }),
 
   getUsers: () => request<UserWithEnrollments[]>('/users/'),
-  inviteUser: (data: { email: string; name: string; course_id: string; password?: string; send_email?: boolean }) =>
-    request<{ user_id: string; email_sent: boolean }>('/users/invite', { method: 'POST', body: JSON.stringify(data) }),
+  inviteUser: (data: { email: string; name: string; course_id: string; send_email?: boolean }) =>
+    request<{ user_id: string; email_sent: boolean; invite_url: string | null; pending_invite: boolean }>('/users/invite', { method: 'POST', body: JSON.stringify(data) }),
   toggleUserActive: (userId: string) =>
     request<{ is_active: boolean }>('/users/' + userId + '/toggle-active', { method: 'PUT' }),
   enrollUser: (userId: string, courseId: string) =>
