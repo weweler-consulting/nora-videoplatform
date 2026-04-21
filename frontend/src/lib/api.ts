@@ -197,7 +197,25 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ embed_url: embedUrl }),
     }),
+
+  // Integrations (service tokens)
+  listServiceTokens: () =>
+    request<ServiceTokenInfo[]>('/integrations/tokens'),
+  createServiceToken: (name: string) =>
+    request<ServiceTokenInfo & { token: string }>('/integrations/tokens', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }),
+  deleteServiceToken: (id: string) =>
+    request<{ ok: boolean }>(`/integrations/tokens/${id}`, { method: 'DELETE' }),
 };
+
+export interface ServiceTokenInfo {
+  id: string;
+  name: string;
+  created_at: string;
+  last_used_at: string | null;
+}
 
 // Types
 export interface UserEnrollment {

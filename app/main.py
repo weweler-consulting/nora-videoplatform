@@ -16,7 +16,7 @@ from sqlalchemy import text
 from app.core.db import engine, Base
 from app.core.drip_notifier import drip_notifier_loop
 from app.core.ratelimit import limiter
-from app.api import auth, courses, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook, attachments
+from app.api import auth, courses, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook, attachments, integrations
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +119,7 @@ app.include_router(upload.router, prefix="/api/v1/upload", tags=["upload"])
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
 app.include_router(stripe_webhook.router, prefix="/api/v1/stripe", tags=["stripe"])
 app.include_router(attachments.router, prefix="/api/v1", tags=["attachments"])
+app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["integrations"])
 
 
 @app.get("/api/v1/health")

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.db import get_db
-from app.core.auth import require_admin
+from app.core.auth import require_admin, require_admin_or_service
 from app.core.time import utc_now
 from app.models.user import User
 from app.models.course import Enrollment, Course, Module, Section, Lesson, LessonProgress, ModuleUnlock
@@ -64,7 +64,7 @@ async def list_users(admin: User = Depends(require_admin), db: AsyncSession = De
 
 
 @router.post("/invite", response_model=dict)
-async def invite_user(data: InviteRequest, request: Request, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+async def invite_user(data: InviteRequest, request: Request, _auth=Depends(require_admin_or_service), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
 

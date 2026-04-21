@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.db import get_db
-from app.core.auth import get_current_user, require_admin
+from app.core.auth import get_current_user, require_admin, require_admin_or_service
 from app.core.time import utc_now
 from app.models.user import User
 from app.models.course import Course, Module, Section, Lesson, Enrollment, LessonProgress, ModuleUnlock
@@ -184,7 +184,7 @@ async def delete_course(course_id: str, admin: User = Depends(require_admin), db
 
 # Admin: list all courses (must be before {course_id} route)
 @router.get("/admin/all", response_model=list[CourseListItem])
-async def list_all_courses(admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+async def list_all_courses(_auth=Depends(require_admin_or_service), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Course).options(
             selectinload(Course.modules).selectinload(Module.sections).selectinload(Section.lessons)

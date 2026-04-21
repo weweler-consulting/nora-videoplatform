@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Union
 
 import hashlib
 import hmac
 import secrets
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.core.db import get_db
 from app.core.time import utc_now
 from app.models.user import User
+from app.models.service_token import ServiceToken
 
 security = HTTPBearer()
 
@@ -86,6 +87,58 @@ async def get_current_user(
 
 
 async def require_admin(user: User = Depends(get_current_user)) -> User:
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin required")
+    return user
+
+
+def hash_service_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def generate_service_token() -> str:
+    """Return a fresh random service token in the `nvp_` prefixed format."""
+    return f"nvp_{secrets.token_urlsafe(32)}"
+
+
+async def _resolve_service_token(request: Request, db: AsyncSession) -> Optional[ServiceToken]:
+    raw = request.headers.get("X-Service-Token")
+    if not raw:
+        return None
+    token_hash = hash_service_token(raw)
+    result = await db.execute(select(ServiceToken).where(ServiceToken.token_hash == token_hash))
+    token = result.scalar_one_or_none()
+    if token:
+        token.last_used_at = utc_now()
+    return token
+
+
+async def require_admin_or_service(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Union[User, ServiceToken]:
+    """Accept either a service token (X-Service-Token header) or an admin JWT.
+
+    Service tokens are used by other internal apps (e.g. the CRM) to call
+    admin endpoints without needing an admin user login.
+    """
+    service_token = await _resolve_service_token(request, db)
+    if service_token:
+        return service_token
+
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing credentials")
+    jwt_token = auth_header[7:]
+    user_id = decode_access_token(jwt_token)
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    user_result = await db.execute(select(User).where(User.id == user_id))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account deaktiviert")
     if not user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin required")
     return user
