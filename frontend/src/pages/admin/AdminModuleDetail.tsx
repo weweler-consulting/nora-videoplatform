@@ -117,11 +117,13 @@ export default function AdminModuleDetail() {
         <span className="text-gray-700">{module.title}</span>
       </div>
 
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold">{module.title}</h2>
+      <div className="flex items-center justify-between mb-6 gap-4">
+        <div className="flex-1 min-w-0">
+          <EditableModuleTitle moduleId={module.id} value={module.title} onSaved={load} />
+        </div>
         <button
           onClick={() => { resetForm(); setShowCreate(true); }}
-          className="px-4 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors"
+          className="px-4 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors shrink-0"
         >
           + Neue Lektion
         </button>
@@ -216,6 +218,55 @@ export default function AdminModuleDetail() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function EditableModuleTitle({ moduleId, value, onSaved }: { moduleId: string; value: string; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  const save = async () => {
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      setDraft(value);
+      setEditing(false);
+      return;
+    }
+    if (trimmed !== value) {
+      await api.updateModule(moduleId, { title: trimmed });
+      onSaved();
+    }
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') save();
+          if (e.key === 'Escape') { setDraft(value); setEditing(false); }
+        }}
+        className="text-xl font-semibold w-full px-2 py-1 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] focus:border-transparent"
+        autoFocus
+      />
+    );
+  }
+
+  return (
+    <div
+      onClick={() => { setDraft(value); setEditing(true); }}
+      className="cursor-pointer group/edit inline-flex items-center gap-2"
+      title="Klicken zum Bearbeiten"
+    >
+      <h2 className="text-xl font-semibold">{value}</h2>
+      <svg className="w-3.5 h-3.5 text-gray-300 group-hover/edit:text-gray-500 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+      </svg>
     </div>
   );
 }
