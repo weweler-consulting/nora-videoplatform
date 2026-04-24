@@ -195,3 +195,64 @@ async def test_pdf_upload_rejects_non_pdf(client, session):
         files={"file": ("a.exe", b"MZ", "application/x-msdownload")},
     )
     assert r.status_code == 400
+
+
+from unittest.mock import patch, AsyncMock
+
+
+@pytest.mark.asyncio
+async def test_image_upload_rejects_non_image(client, session):
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    await _mk_hub(session, course.id)
+    token = create_access_token(admin.id)
+    r = await client.post(
+        f"/api/v1/admin/courses/{course.id}/hub/image",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("a.pdf", b"%PDF", "application/pdf")},
+        data={"kind": "product"},
+    )
+    assert r.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_image_upload_returns_cdn_url(client, session, monkeypatch):
+    monkeypatch.setenv("BUNNY_STORAGE_ZONE", "z")
+    monkeypatch.setenv("BUNNY_STORAGE_KEY", "k")
+    monkeypatch.setenv("BUNNY_STORAGE_PULL_ZONE", "https://cdn.example.com")
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    await _mk_hub(session, course.id)
+    token = create_access_token(admin.id)
+
+    mock_resp = AsyncMock()
+    mock_resp.status_code = 201
+    with patch("httpx.AsyncClient.put", return_value=mock_resp):
+        # 8x8 PNG bytes — small but valid enough for header check
+        png = (b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+        r = await client.post(
+            f"/api/v1/admin/courses/{course.id}/hub/image",
+            headers={"Authorization": f"Bearer {token}"},
+            files={"file": ("a.png", png, "image/png")},
+            data={"kind": "product"},
+        )
+    assert r.status_code == 200
+    assert r.json()["url"].startswith("https://cdn.example.com/hub/")
+
+
+@pytest.mark.asyncio
+async def test_image_upload_when_bunny_not_configured(client, session, monkeypatch):
+    monkeypatch.delenv("BUNNY_STORAGE_ZONE", raising=False)
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    await _mk_hub(session, course.id)
+    token = create_access_token(admin.id)
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    r = await client.post(
+        f"/api/v1/admin/courses/{course.id}/hub/image",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("a.png", png, "image/png")},
+        data={"kind": "product"},
+    )
+    assert r.status_code == 503
+    assert "Bunny" in r.json().get("detail", "")
