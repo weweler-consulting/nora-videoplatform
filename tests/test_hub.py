@@ -256,3 +256,114 @@ async def test_image_upload_when_bunny_not_configured(client, session, monkeypat
     )
     assert r.status_code == 503
     assert "Bunny" in r.json().get("detail", "")
+
+
+@pytest.mark.asyncio
+async def test_admin_put_replaces_lists(client, session):
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    hub = await _mk_hub(session, course.id)
+    session.add(HubLink(hub_id=hub.id, icon_type="book", label="Alt"))
+    await session.commit()
+    token = create_access_token(admin.id)
+
+    payload = {
+        "hero_variant": "dark",
+        "hero_eyebrow": "New",
+        "hero_title_html": "<em>Hi</em><br><script>x</script>",
+        "hero_body": "",
+        "contact_user_id": None, "contact_name_override": "", "contact_role": "Rolle",
+        "contact_email_override": "", "contact_whatsapp_url": "", "contact_photo_url": "",
+        "show_contact": True, "show_live_calls": True,
+        "show_products": True, "show_downloads": True,
+        "links": [
+            {"icon_type": "video", "label": "Neu", "sublabel": "s", "url": "", "sort_order": 0}
+        ],
+        "live_calls": [], "products": [], "downloads": [],
+    }
+    r = await client.put(
+        f"/api/v1/admin/courses/{course.id}/hub",
+        headers={"Authorization": f"Bearer {token}"},
+        json=payload,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["hero_variant"] == "dark"
+    assert len(data["links"]) == 1
+    assert data["links"][0]["label"] == "Neu"
+    # Sanitizer strips <script>
+    assert "<script>" not in data["hero_title_html"]
+    assert "<em>Hi</em>" in data["hero_title_html"]
+
+
+@pytest.mark.asyncio
+async def test_admin_put_requires_admin(client, session):
+    user = await _mk_user(session)
+    course = await _mk_course(session)
+    await _mk_hub(session, course.id)
+    token = create_access_token(user.id)
+    r = await client.put(
+        f"/api/v1/admin/courses/{course.id}/hub",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "hero_variant": "berry", "hero_eyebrow": "", "hero_title_html": "",
+            "hero_body": "", "contact_user_id": None, "contact_name_override": "",
+            "contact_role": "", "contact_email_override": "", "contact_whatsapp_url": "",
+            "contact_photo_url": "", "show_contact": True, "show_live_calls": True,
+            "show_products": True, "show_downloads": True,
+            "links": [], "live_calls": [], "products": [], "downloads": [],
+        },
+    )
+    assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_admin_put_cleans_up_removed_pdfs(client, session, tmp_path, monkeypatch):
+    monkeypatch.setenv("HUB_STORAGE_DIR", str(tmp_path / "hub"))
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    hub = await _mk_hub(session, course.id)
+    # Place PDF under the allowed storage root so the path-traversal guard accepts it
+    # when referenced in the payload (here the payload has no downloads so guard isn't hit).
+    pdf_root = tmp_path / "hub" / course.id
+    pdf_root.mkdir(parents=True, exist_ok=True)
+    pdf = pdf_root / "old.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    session.add(HubDownload(
+        hub_id=hub.id, title="Old", file_path=str(pdf), file_name="old.pdf",
+    ))
+    await session.commit()
+    assert pdf.exists()
+    token = create_access_token(admin.id)
+
+    payload = {
+        "hero_variant": "berry", "hero_eyebrow": "", "hero_title_html": "",
+        "hero_body": "", "contact_user_id": None, "contact_name_override": "",
+        "contact_role": "", "contact_email_override": "", "contact_whatsapp_url": "",
+        "contact_photo_url": "", "show_contact": True, "show_live_calls": True,
+        "show_products": True, "show_downloads": True,
+        "links": [], "live_calls": [], "products": [], "downloads": [],
+    }
+    r = await client.put(
+        f"/api/v1/admin/courses/{course.id}/hub",
+        headers={"Authorization": f"Bearer {token}"},
+        json=payload,
+    )
+    assert r.status_code == 200
+    assert not pdf.exists()
+
+
+@pytest.mark.asyncio
+async def test_admin_get_hub_returns_payload(client, session):
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    hub = await _mk_hub(session, course.id)
+    hub.hero_eyebrow = "From Admin"
+    await session.commit()
+    token = create_access_token(admin.id)
+    r = await client.get(
+        f"/api/v1/admin/courses/{course.id}/hub",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200
+    assert r.json()["hero_eyebrow"] == "From Admin"
