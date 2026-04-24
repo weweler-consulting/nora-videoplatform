@@ -64,10 +64,11 @@ export default function HubHero({
           background: dark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.6)',
           borderRadius: 14, padding: '18px 22px', textAlign: 'center',
           border: `1px solid ${dark ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.9)'}`,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         }}>
           {contactPhotoUrl && (
             <img src={contactPhotoUrl} alt={contactName} style={{
-              width: 56, height: 56, borderRadius: '50%', objectFit: 'cover',
+              width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', display: 'block',
             }} />
           )}
           <div style={{
