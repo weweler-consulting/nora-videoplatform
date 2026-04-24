@@ -90,12 +90,29 @@ export default function AdminCourseDetail() {
             inputClassName="text-gray-500 w-full"
           />
         </div>
-        <button
-          onClick={() => setShowCreate(!showCreate)}
-          className="px-4 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors"
-        >
-          + Neues Modul
-        </button>
+        <div className="flex items-center gap-3 shrink-0">
+          <Link
+            to={`/admin/course/${courseId}/hub`}
+            style={{
+              padding: '8px 18px',
+              borderRadius: 'var(--radius-pill)',
+              background: 'var(--berry)',
+              color: '#fff',
+              textDecoration: 'none',
+              fontSize: 13,
+              fontWeight: 700,
+              letterSpacing: '0.3px',
+            }}
+          >
+            Mitgliederbereich bearbeiten
+          </Link>
+          <button
+            onClick={() => setShowCreate(!showCreate)}
+            className="px-4 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors"
+          >
+            + Neues Modul
+          </button>
+        </div>
       </div>
 
       {/* Stripe Product ID */}
