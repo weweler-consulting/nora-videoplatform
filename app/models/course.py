@@ -22,6 +22,8 @@ class Course(Base):
 
     modules = relationship("Module", back_populates="course", order_by="Module.sort_order", cascade="all, delete-orphan")
     enrollments = relationship("Enrollment", back_populates="course", cascade="all, delete-orphan")
+    hub = relationship("CourseHub", uselist=False, cascade="all, delete-orphan",
+                       back_populates="course", lazy="selectin")
 
 
 class Module(Base):
