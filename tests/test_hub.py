@@ -148,3 +148,50 @@ async def test_download_rejects_mismatched_course(client, session, tmp_path):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_pdf_upload_requires_admin(client, session):
+    user = await _mk_user(session, admin=False)
+    course = await _mk_course(session)
+    await _mk_hub(session, course.id)
+    token = create_access_token(user.id)
+    r = await client.post(
+        f"/api/v1/admin/courses/{course.id}/hub/pdf",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("a.pdf", b"%PDF-1.4", "application/pdf")},
+    )
+    assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_pdf_upload_saves_file(client, session, tmp_path, monkeypatch):
+    monkeypatch.setenv("HUB_STORAGE_DIR", str(tmp_path / "hub"))
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    await _mk_hub(session, course.id)
+    token = create_access_token(admin.id)
+    r = await client.post(
+        f"/api/v1/admin/courses/{course.id}/hub/pdf",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("Einkaufsliste.pdf", b"%PDF-1.4 content", "application/pdf")},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["file_name"] == "Einkaufsliste.pdf"
+    assert data["file_size_kb"] >= 0
+    assert Path(data["file_path"]).exists()
+
+
+@pytest.mark.asyncio
+async def test_pdf_upload_rejects_non_pdf(client, session):
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    await _mk_hub(session, course.id)
+    token = create_access_token(admin.id)
+    r = await client.post(
+        f"/api/v1/admin/courses/{course.id}/hub/pdf",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("a.exe", b"MZ", "application/x-msdownload")},
+    )
+    assert r.status_code == 400
