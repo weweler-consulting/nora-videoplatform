@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { hubApi, HubPayload } from '../../../lib/api/hub';
+import { hubApi } from '../../../lib/api/hub';
+import type { HubPayload } from '../../../lib/api/hub';
 import HubHero from './HubHero';
 import HubLinks from './HubLinks';
 import HubContact from './HubContact';

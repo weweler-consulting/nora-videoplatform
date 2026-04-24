@@ -1,4 +1,4 @@
-import { HubLiveCall } from '../../../lib/api/hub';
+import type { HubLiveCall } from '../../../lib/api/hub';
 
 export default function HubLiveCalls({ calls }: { calls: HubLiveCall[] }) {
   return (

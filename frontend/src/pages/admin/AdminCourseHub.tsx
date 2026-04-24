@@ -1,8 +1,9 @@
 // frontend/src/pages/admin/AdminCourseHub.tsx
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  hubApi, HubPayload, HeroVariant,
+import { hubApi } from '../../lib/api/hub';
+import type {
+  HubPayload, HeroVariant,
   HubLink as HubLinkType, HubLiveCall as LiveCallType,
   HubProduct as ProductType, HubDownload as DownloadType,
   IconType,

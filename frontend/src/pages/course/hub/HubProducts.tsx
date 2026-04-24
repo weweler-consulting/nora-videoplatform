@@ -1,4 +1,4 @@
-import { HubProduct } from '../../../lib/api/hub';
+import type { HubProduct } from '../../../lib/api/hub';
 
 export default function HubProducts({ products }: { products: HubProduct[] }) {
   return (

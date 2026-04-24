@@ -1,4 +1,4 @@
-import { HeroVariant } from '../../../lib/api/hub';
+import type { HeroVariant } from '../../../lib/api/hub';
 
 const GRADIENTS: Record<HeroVariant, string> = {
   berry: 'var(--gradient-berry)',

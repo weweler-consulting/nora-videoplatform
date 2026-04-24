@@ -1,5 +1,5 @@
-import { HubDownload } from '../../../lib/api/hub';
 import { downloadHubFile } from '../../../lib/api/hub';
+import type { HubDownload } from '../../../lib/api/hub';
 
 export default function HubDownloads({
   courseId, downloads,

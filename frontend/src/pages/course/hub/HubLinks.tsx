@@ -1,4 +1,4 @@
-import { HubLink, IconType } from '../../../lib/api/hub';
+import type { HubLink, IconType } from '../../../lib/api/hub';
 
 function Icon({ type }: { type: IconType }) {
   const c = 'var(--berry)';
