@@ -17,7 +17,7 @@ from app.core.auth import (
     decode_email_change_token,
     get_current_user,
 )
-from app.core.email import send_password_reset_email, send_email_change_verification
+from app.core.email import send_invite_email, send_password_reset_email, send_email_change_verification
 from app.core.ratelimit import limiter
 from app.core.time import utc_now
 from app.models.user import User
@@ -102,15 +102,37 @@ class ResetPasswordRequest(BaseModel):
 @limiter.limit("5/hour")
 async def forgot_password(request: Request, data: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
     try:
-        result = await db.execute(select(User).where(User.email == data.email))
-        user = result.scalar_one_or_none()
+        result = await db.execute(
+            select(User)
+            .where(User.email == data.email)
+            .options(selectinload(User.enrollments).selectinload(Enrollment.course))
+        )
+        user = result.unique().scalar_one_or_none()
         if not user:
+            return {"ok": True}
+        base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
+        if not user.invite_accepted_at:
+            # User has never accepted their invite. A reset link is useless — they
+            # need to accept the invite (which also sets the password). Refresh
+            # the invite token if expired and resend the invite email.
+            if not user.invite_token or not user.invite_token_expires or user.invite_token_expires < utc_now():
+                user.invite_token = secrets.token_urlsafe(32)
+                user.invite_token_expires = utc_now() + timedelta(days=7)
+                await db.flush()
+            invite_url = f"{base}/accept-invite?token={user.invite_token}"
+            course_title = next(
+                (e.course.title for e in user.enrollments if e.course is not None),
+                "Kurs",
+            )
+            try:
+                send_invite_email(user.email, user.name, course_title, invite_url)
+            except Exception as e:
+                logger.error(f"Failed to resend invite email on forgot-password: {e}")
             return {"ok": True}
         token = secrets.token_urlsafe(32)
         user.reset_token = token
         user.reset_token_expires = utc_now() + timedelta(hours=1)
         await db.flush()
-        base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
         reset_url = f"{base}/reset-password?token={token}"
         try:
             send_password_reset_email(user.email, user.name, reset_url)

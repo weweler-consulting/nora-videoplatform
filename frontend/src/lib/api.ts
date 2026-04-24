@@ -29,17 +29,31 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
 
   if (res.status === 401) {
-    clearToken();
-    window.dispatchEvent(new CustomEvent('auth:unauthorized'));
-    throw new Error('Unauthorized');
+    const body = await res.json().catch(() => ({}));
+    if (path !== '/auth/login') {
+      clearToken();
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+    }
+    const err = new Error(body.detail || 'Unauthorized') as ApiError;
+    err.status = 401;
+    err.detail = body.detail;
+    throw err;
   }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || `HTTP ${res.status}`);
+    const err = new Error(body.detail || `HTTP ${res.status}`) as ApiError;
+    err.status = res.status;
+    err.detail = body.detail;
+    throw err;
   }
 
   return res.json();
+}
+
+export interface ApiError extends Error {
+  status: number;
+  detail?: string;
 }
 
 export const api = {

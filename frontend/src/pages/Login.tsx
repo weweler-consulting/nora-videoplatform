@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api, setToken } from '../lib/api';
+import type { ApiError } from '../lib/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -24,7 +25,12 @@ export default function Login() {
       setToken(access_token);
       navigate('/');
     } catch (err) {
-      setError('E-Mail oder Passwort falsch.');
+      const apiErr = err as ApiError;
+      if (apiErr.status === 403 && apiErr.detail) {
+        setError(apiErr.detail);
+      } else {
+        setError('E-Mail oder Passwort falsch.');
+      }
     } finally {
       setLoading(false);
     }
