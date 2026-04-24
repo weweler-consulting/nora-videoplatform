@@ -69,3 +69,82 @@ async def test_admin_sees_hub_without_enrollment(client, session):
     r = await client.get(f"/api/v1/courses/{course.id}/hub",
                          headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
+
+
+from pathlib import Path
+
+from app.models.hub import HubDownload
+
+
+@pytest.mark.asyncio
+async def test_download_requires_enrollment(client, session, tmp_path):
+    user = await _mk_user(session)
+    course = await _mk_course(session)
+    hub = await _mk_hub(session, course.id)
+
+    pdf_file = tmp_path / "test.pdf"
+    pdf_file.write_bytes(b"%PDF-1.4 fake content")
+    download = HubDownload(
+        hub_id=hub.id, title="Einkaufsliste", description="",
+        file_path=str(pdf_file), file_name="Einkaufsliste.pdf", file_size_kb=1,
+    )
+    session.add(download)
+    await session.commit()
+
+    token = create_access_token(user.id)
+    r = await client.get(
+        f"/api/v1/courses/{course.id}/hub/downloads/{download.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_download_returns_file(client, session, tmp_path):
+    user = await _mk_user(session)
+    course = await _mk_course(session)
+    hub = await _mk_hub(session, course.id)
+    session.add(Enrollment(user_id=user.id, course_id=course.id))
+
+    pdf_file = tmp_path / "test.pdf"
+    pdf_file.write_bytes(b"%PDF-1.4 fake content")
+    download = HubDownload(
+        hub_id=hub.id, title="Einkaufsliste",
+        file_path=str(pdf_file), file_name="Original Name.pdf", file_size_kb=1,
+    )
+    session.add(download)
+    await session.commit()
+
+    token = create_access_token(user.id)
+    r = await client.get(
+        f"/api/v1/courses/{course.id}/hub/downloads/{download.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200
+    assert "Original Name.pdf" in r.headers.get("content-disposition", "")
+    assert r.content == b"%PDF-1.4 fake content"
+
+
+@pytest.mark.asyncio
+async def test_download_rejects_mismatched_course(client, session, tmp_path):
+    user = await _mk_user(session)
+    course_a = await _mk_course(session)
+    course_b = await _mk_course(session)
+    hub_b = await _mk_hub(session, course_b.id)
+    session.add(Enrollment(user_id=user.id, course_id=course_a.id))
+
+    pdf_file = tmp_path / "test.pdf"
+    pdf_file.write_bytes(b"x")
+    download = HubDownload(
+        hub_id=hub_b.id, title="t", file_path=str(pdf_file), file_name="t.pdf",
+    )
+    session.add(download)
+    await session.commit()
+
+    token = create_access_token(user.id)
+    # course_a in path but download belongs to course_b
+    r = await client.get(
+        f"/api/v1/courses/{course_a.id}/hub/downloads/{download.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 404

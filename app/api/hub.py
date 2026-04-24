@@ -1,4 +1,8 @@
+from pathlib import Path
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -6,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from app.core.auth import get_current_user
 from app.core.db import get_db
 from app.models.course import Course, Enrollment
-from app.models.hub import CourseHub
+from app.models.hub import CourseHub, HubDownload
 from app.models.user import User
 from app.schemas.hub import (
     HubDownloadSchema, HubLinkSchema, HubLiveCallSchema, HubPayload, HubProductSchema,
@@ -88,3 +92,32 @@ async def get_course_hub(
     await _ensure_access(course_id, user, db)
     hub = await _load_hub(db, course_id)
     return _hub_to_payload(hub)
+
+
+@router.get("/{course_id}/hub/downloads/{download_id}")
+async def download_hub_file(
+    course_id: str,
+    download_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _ensure_access(course_id, user, db)
+    result = await db.execute(
+        select(HubDownload).join(CourseHub, CourseHub.id == HubDownload.hub_id)
+        .where(HubDownload.id == download_id, CourseHub.course_id == course_id)
+    )
+    download = result.scalar_one_or_none()
+    if not download:
+        raise HTTPException(status_code=404, detail="Download not found")
+    path = Path(download.file_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="File missing on disk")
+    encoded = quote(download.file_name)
+    content_disposition = (
+        f'attachment; filename="{download.file_name}"; filename*=utf-8\'\'{encoded}'
+    )
+    return FileResponse(
+        path=str(path),
+        media_type="application/pdf",
+        headers={"Content-Disposition": content_disposition},
+    )
