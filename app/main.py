@@ -17,8 +17,14 @@ from app.core.db import engine, Base
 from app.core.drip_notifier import drip_notifier_loop
 from app.core.ratelimit import limiter
 from app.api import auth, courses, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook, attachments, integrations
+from app.models import hub as _hub_models  # noqa: F401 — register Hub tables with Base
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
+
+HUB_DOWNLOADS_DIR = Path(os.environ.get("HUB_STORAGE_DIR", "/app/data/hub_downloads"))
+if not HUB_DOWNLOADS_DIR.parent.exists():
+    HUB_DOWNLOADS_DIR = Path(__file__).parent.parent / "data" / "hub_downloads"
 
 _FK_CASCADES = [
     ("modules", "course_id", "courses"),
@@ -71,6 +77,32 @@ def _build_migration_statements() -> list[str]:
     return stmts
 
 
+async def _backfill_course_hubs() -> None:
+    """Ensure every Course has a CourseHub row (idempotent via unique constraint)."""
+    async with engine.begin() as conn:
+        if engine.dialect.name == "sqlite":
+            result = await conn.execute(text(
+                "INSERT INTO course_hubs (id, course_id, hero_variant, hero_eyebrow, "
+                "hero_title_html, hero_body, contact_role, show_contact, show_live_calls, "
+                "show_products, show_downloads, updated_at) "
+                "SELECT lower(hex(randomblob(16))), c.id, 'berry', '', '', '', "
+                "'Kursleitung & Ernährungsberaterin', 1, 1, 1, 1, CURRENT_TIMESTAMP "
+                "FROM courses c WHERE NOT EXISTS "
+                "(SELECT 1 FROM course_hubs h WHERE h.course_id = c.id)"
+            ))
+        else:
+            result = await conn.execute(text(
+                "INSERT INTO course_hubs (id, course_id, hero_variant, hero_eyebrow, "
+                "hero_title_html, hero_body, contact_role, show_contact, show_live_calls, "
+                "show_products, show_downloads, updated_at) "
+                "SELECT gen_random_uuid()::text, c.id, 'berry', '', '', '', "
+                "'Kursleitung & Ernährungsberaterin', TRUE, TRUE, TRUE, TRUE, NOW() "
+                "FROM courses c WHERE NOT EXISTS "
+                "(SELECT 1 FROM course_hubs h WHERE h.course_id = c.id)"
+            ))
+        logger.info(f"Hub backfill: {result.rowcount} hubs created")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
@@ -87,6 +119,13 @@ async def lifespan(app: FastAPI):
             if "already exists" in msg or "duplicate" in msg:
                 continue
             logger.warning(f"Migration step failed: {stmt[:100]}... — {e}")
+    # Ensure hub download storage exists
+    HUB_DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    # Backfill: every existing Course gets an empty CourseHub
+    try:
+        await _backfill_course_hubs()
+    except Exception as e:
+        logger.warning(f"Hub backfill failed: {e}")
     task = asyncio.create_task(drip_notifier_loop())
     yield
     task.cancel()
