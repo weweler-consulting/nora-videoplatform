@@ -3,6 +3,16 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import { api, type CourseDetail, type LessonItem, type AttachmentItem } from '../lib/api';
 
+// Normalise a Bunny Stream embed URL: force the iframe.mediadelivery.net host
+// and append params iOS Safari needs to play inline (otherwise the player
+// tries to enter native fullscreen from inside the iframe and the frame stays
+// black).
+function withPlayerParams(rawUrl: string): string {
+  const url = rawUrl.replace('player.mediadelivery.net', 'iframe.mediadelivery.net');
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}playsinline=true&preload=true&responsive=true`;
+}
+
 export default function LessonView() {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
   const [course, setCourse] = useState<CourseDetail | null>(null);
@@ -159,13 +169,13 @@ export default function LessonView() {
       {/* Lesson title */}
       <h2 className="text-lg md:text-xl font-semibold mb-4 md:mb-6">{currentLesson.title}</h2>
 
-      {/* Video player — border-radius on the iframe itself; clipping the parent
-          breaks Bunny/<video> layer compositing on iOS Safari (black frame with
-          controls visible). */}
+      {/* Video player — playsinline=true is required so iOS Safari plays the
+          video inline instead of trying to enter native fullscreen, which fails
+          inside the iframe and leaves the frame black. */}
       {currentLesson.video_url ? (
         <div className="aspect-video bg-black rounded-2xl mb-4 md:mb-6">
           <iframe
-            src={currentLesson.video_url.replace('player.mediadelivery.net', 'iframe.mediadelivery.net')}
+            src={withPlayerParams(currentLesson.video_url)}
             title={currentLesson.title}
             className="w-full h-full block rounded-2xl"
             style={{ border: 0 }}
