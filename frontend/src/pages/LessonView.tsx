@@ -152,12 +152,21 @@ export default function LessonView() {
       {currentLesson.video_url ? (
         <div className="aspect-video bg-black rounded-2xl overflow-hidden mb-6">
           <iframe
-            src={currentLesson.video_url.replace('player.mediadelivery.net', 'iframe.mediadelivery.net')}
+            src={(() => {
+              const base = currentLesson.video_url.replace('player.mediadelivery.net', 'iframe.mediadelivery.net');
+              const sep = base.includes('?') ? '&' : '?';
+              // playsinline=true: prevents iOS Safari from forcing native fullscreen on tap
+              return `${base}${sep}responsive=true&playsinline=true&preload=true`;
+            })()}
             className="w-full h-full"
-            loading="lazy"
             allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
             allowFullScreen
-          />
+          >
+            <p className="text-white p-4">
+              Das Video kann nicht geladen werden. Bitte aktiviere JavaScript und prüfe deine
+              Browser-Einstellungen (insbesondere Cookies/Tracking-Schutz für mediadelivery.net).
+            </p>
+          </iframe>
         </div>
       ) : (
         <div className="aspect-video bg-gray-100 rounded-2xl flex items-center justify-center mb-6 text-gray-400">
