@@ -20,16 +20,13 @@ export default function HubHero({
 }) {
   const dark = variant !== 'pale';
   return (
-    <div style={{
-      background: GRADIENTS[variant],
-      borderRadius: 'var(--radius-xl)',
-      padding: '32px 36px',
-      marginBottom: 36,
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      gap: 20,
-    }}>
+    <div
+      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 mb-8 p-6 sm:p-8"
+      style={{
+        background: GRADIENTS[variant],
+        borderRadius: 'var(--radius-xl)',
+      }}
+    >
       <div style={{ maxWidth: 520 }}>
         {eyebrow && (
           <div style={{

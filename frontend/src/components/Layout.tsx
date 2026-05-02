@@ -10,6 +10,7 @@ interface UserInfo {
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserInfo | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -27,16 +28,60 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [user, location.pathname, navigate]);
 
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [location.pathname]);
+
   const handleLogout = () => {
     clearToken();
     navigate('/login');
   };
 
+  const closeDrawer = () => setDrawerOpen(false);
+
   return (
-    <div className="min-h-screen flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-[var(--nora-pink-light)] flex flex-col shrink-0">
-        <div className="p-5 border-b border-[var(--nora-pink-light)]">
+    <div className="min-h-screen md:flex">
+      {/* Mobile topbar */}
+      <header className="md:hidden sticky top-0 z-30 flex items-center justify-between bg-white border-b border-[var(--nora-pink-light)] px-4 h-14">
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Menü öffnen"
+          className="p-2 -ml-2 rounded-md text-gray-700 hover:bg-[var(--nora-pink-light)]"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div className="flex items-center gap-2">
+          <img src="/nw-logo.webp" alt="NW" className="w-7 h-7" />
+          <span className="text-sm font-semibold text-gray-800">Nora Weweler</span>
+        </div>
+        <div className="w-9" aria-hidden />
+      </header>
+
+      {/* Backdrop */}
+      {drawerOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/40 z-40"
+          onClick={closeDrawer}
+          aria-hidden
+        />
+      )}
+
+      {/* Sidebar / Drawer */}
+      <aside
+        className={`
+          fixed md:static inset-y-0 left-0 z-50
+          w-72 md:w-64 bg-white border-r border-[var(--nora-pink-light)]
+          flex flex-col shrink-0
+          transform transition-transform duration-200 ease-out
+          ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:translate-x-0
+        `}
+      >
+        <div className="p-5 border-b border-[var(--nora-pink-light)] flex items-start justify-between">
           <div className="flex items-center gap-3">
             <img src="/nw-logo.webp" alt="NW" className="w-10 h-10" />
             <div>
@@ -44,17 +89,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <p className="text-xs text-gray-400 leading-tight">Ernährungsberatung · Kurse</p>
             </div>
           </div>
-          {user && (
-            <div className="mt-4 flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-[var(--nora-pink-light)] flex items-center justify-center text-xs font-semibold text-[var(--nora-pink-dark)]">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-              <span className="text-sm text-gray-600">{user.name}</span>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={closeDrawer}
+            aria-label="Menü schließen"
+            className="md:hidden p-1 -mr-1 rounded text-gray-500 hover:bg-[var(--nora-pink-light)]"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
+        {user && (
+          <div className="px-5 py-3 border-b border-[var(--nora-pink-light)] flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-[var(--nora-pink-light)] flex items-center justify-center text-xs font-semibold text-[var(--nora-pink-dark)]">
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+            <span className="text-sm text-gray-600">{user.name}</span>
+          </div>
+        )}
 
-        <nav className="flex-1 p-4">
+        <nav className="flex-1 p-4 overflow-y-auto">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
             Inhalte
           </p>
@@ -134,7 +189,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 md:overflow-auto min-w-0">
         {children}
       </main>
     </div>

@@ -110,9 +110,9 @@ export default function LessonView() {
   }
 
   return (
-    <div className="p-8 max-w-4xl">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6 flex-wrap">
+    <div className="p-4 md:p-8 max-w-4xl">
+      {/* Breadcrumb — desktop */}
+      <div className="hidden md:flex items-center gap-2 text-sm text-gray-500 mb-6 flex-wrap">
         <Link to="/" className="hover:text-[var(--nora-pink-dark)] transition-colors">
           Meine Kurse
         </Link>
@@ -126,55 +126,66 @@ export default function LessonView() {
         <span className="text-gray-700 truncate">{currentLesson.title}</span>
       </div>
 
+      {/* Back link — mobile */}
+      <Link
+        to={`/course/${courseId}`}
+        className="md:hidden inline-flex items-center gap-2 text-sm text-gray-500 mb-4 hover:text-[var(--nora-pink-dark)]"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Zurück zum Kurs
+      </Link>
+
       {/* Module header bar — clickable back to course */}
       <Link
         to={`/course/${courseId}`}
-        className="bg-gradient-to-r from-[var(--nora-pink)] to-[var(--nora-pink-dark)] rounded-2xl p-5 mb-6 flex items-center justify-between text-white group block hover:opacity-95 transition-opacity"
+        className="bg-gradient-to-r from-[var(--nora-pink)] to-[var(--nora-pink-dark)] rounded-2xl p-4 md:p-5 mb-4 md:mb-6 flex items-center justify-between text-white group hover:opacity-95 transition-opacity gap-3"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <svg className="w-5 h-5 opacity-60 group-hover:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          <div>
-            <p className="text-xs opacity-80 uppercase tracking-wider">{sectionName}</p>
-            <h2 className="text-lg font-semibold">{moduleName}</h2>
+          <div className="min-w-0">
+            <p className="text-xs opacity-80 uppercase tracking-wider truncate">{sectionName}</p>
+            <h2 className="text-base md:text-lg font-semibold truncate">{moduleName}</h2>
           </div>
         </div>
-        <p className="text-sm opacity-80">
+        <p className="text-sm opacity-80 shrink-0">
           {currentIndex + 1} / {allLessons.length}
         </p>
       </Link>
 
       {/* Lesson title */}
-      <h2 className="text-xl font-semibold mb-6">{currentLesson.title}</h2>
+      <h2 className="text-lg md:text-xl font-semibold mb-4 md:mb-6">{currentLesson.title}</h2>
 
       {/* Video player */}
       {currentLesson.video_url ? (
-        <div className="aspect-video bg-black rounded-2xl overflow-hidden mb-6">
+        <div className="aspect-video bg-black rounded-2xl overflow-hidden mb-4 md:mb-6">
           <iframe
             src={currentLesson.video_url.replace('player.mediadelivery.net', 'iframe.mediadelivery.net')}
-            className="w-full h-full"
-            loading="lazy"
+            title={currentLesson.title}
+            className="w-full h-full border-0"
             allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
             allowFullScreen
           />
         </div>
       ) : (
-        <div className="aspect-video bg-gray-100 rounded-2xl flex items-center justify-center mb-6 text-gray-400">
+        <div className="aspect-video bg-gray-100 rounded-2xl flex items-center justify-center mb-4 md:mb-6 text-gray-400">
           Kein Video vorhanden
         </div>
       )}
 
       {/* Description */}
       {currentLesson.description && (
-        <div className="bg-white rounded-2xl p-6 mb-6 prose prose-gray max-w-none prose-headings:text-gray-800 prose-a:text-[var(--nora-pink-dark)] prose-strong:text-gray-800">
+        <div className="bg-white rounded-2xl p-4 md:p-6 mb-4 md:mb-6 prose prose-gray max-w-none prose-headings:text-gray-800 prose-a:text-[var(--nora-pink-dark)] prose-strong:text-gray-800">
           <Markdown>{currentLesson.description}</Markdown>
         </div>
       )}
 
       {/* Downloads */}
       {attachments.length > 0 && (
-        <div className="bg-white rounded-2xl p-6 mb-6">
+        <div className="bg-white rounded-2xl p-4 md:p-6 mb-4 md:mb-6">
           <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -201,13 +212,13 @@ export default function LessonView() {
       )}
 
       {/* Actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <button
           onClick={handleToggleComplete}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition-colors ${
+          className={`flex items-center justify-center gap-2 px-5 py-3 sm:py-2.5 rounded-lg font-medium transition-colors w-full sm:w-auto ${
             currentLesson.completed
               ? 'bg-green-100 text-green-700 hover:bg-green-200'
-              : 'bg-[var(--nora-pink-light)] text-[var(--nora-pink-dark)] hover:bg-[var(--nora-pink)]  hover:text-white'
+              : 'bg-[var(--nora-pink-light)] text-[var(--nora-pink-dark)] hover:bg-[var(--nora-pink)] hover:text-white'
           }`}
         >
           {currentLesson.completed ? (
@@ -222,11 +233,11 @@ export default function LessonView() {
           )}
         </button>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 w-full sm:w-auto">
           {prevLesson && (
             <Link
               to={`/course/${courseId}/lesson/${prevLesson.id}`}
-              className="px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              className="flex-1 sm:flex-none text-center px-4 py-3 sm:py-2.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
             >
               Vorherige
             </Link>
@@ -239,7 +250,7 @@ export default function LessonView() {
                 }
                 handleNext();
               }}
-              className="px-5 py-2.5 rounded-lg bg-[var(--nora-pink)] text-white font-medium hover:bg-[var(--nora-pink-dark)] transition-colors"
+              className="flex-1 sm:flex-none px-5 py-3 sm:py-2.5 rounded-lg bg-[var(--nora-pink)] text-white font-medium hover:bg-[var(--nora-pink-dark)] transition-colors"
             >
               Weiter
             </button>

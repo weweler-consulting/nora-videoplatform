@@ -16,12 +16,12 @@ function ModuleCard({ module, courseId }: { module: ModuleItem; courseId: string
       {/* Module header */}
       <button
         onClick={() => !module.is_locked && setExpanded(!expanded)}
-        className={`w-full text-left p-5 flex items-center gap-5 transition-colors ${module.is_locked ? 'cursor-default' : 'hover:bg-gray-50'}`}
+        className={`w-full text-left p-4 md:p-5 flex items-center gap-3 md:gap-5 transition-colors ${module.is_locked ? 'cursor-default' : 'hover:bg-gray-50'}`}
       >
         {module.image_url ? (
-          <img src={module.image_url} alt="" className="w-20 h-14 object-cover rounded-lg shrink-0" />
+          <img src={module.image_url} alt="" className="w-16 h-12 md:w-20 md:h-14 object-cover rounded-lg shrink-0" />
         ) : (
-          <div className="w-20 h-14 bg-gradient-to-br from-[var(--nora-pink-light)] to-[var(--nora-pink)] rounded-lg shrink-0" />
+          <div className="w-16 h-12 md:w-20 md:h-14 bg-gradient-to-br from-[var(--nora-pink-light)] to-[var(--nora-pink)] rounded-lg shrink-0" />
         )}
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-gray-800">{module.title}</h3>
@@ -53,7 +53,7 @@ function ModuleCard({ module, courseId }: { module: ModuleItem; courseId: string
 
       {/* Expanded sections & lessons */}
       {expanded && (
-        <div className="border-t border-gray-100 px-5 pb-5">
+        <div className="border-t border-gray-100 px-4 md:px-5 pb-4 md:pb-5">
           {module.sections.map((section) => (
             <div key={section.id} className="mt-4">
               <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
@@ -125,31 +125,31 @@ export default function CourseLessons() {
   }
 
   if (!course) {
-    return <div className="p-8 text-gray-500">Kurs nicht gefunden.</div>;
+    return <div className="p-4 md:p-8 text-gray-500">Kurs nicht gefunden.</div>;
   }
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="p-4 md:p-8 max-w-4xl">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
+      <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 md:mb-6 flex-wrap">
         <Link to="/" className="hover:text-[var(--nora-pink-dark)] transition-colors">
           Meine Kurse
         </Link>
         <span>/</span>
-        <span className="text-gray-700">{course.title}</span>
+        <span className="text-gray-700 truncate">{course.title}</span>
       </div>
 
       {/* Course header */}
-      <div className="bg-gradient-to-r from-[var(--nora-pink)] to-[var(--nora-pink-dark)] rounded-2xl p-8 mb-8 flex items-center justify-between text-white">
-        <div>
-          <p className="text-sm opacity-80 uppercase tracking-wider">Kurs</p>
-          <h2 className="text-2xl font-semibold mt-1">{course.title}</h2>
+      <div className="bg-gradient-to-r from-[var(--nora-pink)] to-[var(--nora-pink-dark)] rounded-2xl p-5 md:p-8 mb-6 md:mb-8 flex items-center justify-between text-white gap-4">
+        <div className="min-w-0">
+          <p className="text-xs md:text-sm opacity-80 uppercase tracking-wider">Kurs</p>
+          <h2 className="text-xl md:text-2xl font-semibold mt-1">{course.title}</h2>
           {course.description && (
-            <p className="mt-2 opacity-90">{course.description}</p>
+            <p className="mt-2 opacity-90 text-sm md:text-base">{course.description}</p>
           )}
         </div>
         <div className="shrink-0">
-          <svg width="80" height="80" className="transform -rotate-90">
+          <svg width="64" height="64" className="md:w-20 md:h-20 transform -rotate-90">
             <circle cx="40" cy="40" r="34" stroke="rgba(255,255,255,0.3)" strokeWidth="6" fill="none" />
             <circle
               cx="40" cy="40" r="34"

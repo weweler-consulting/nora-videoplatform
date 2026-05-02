@@ -15,14 +15,7 @@ export default function CourseView() {
 
   return (
     <div>
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          borderBottom: '1px solid var(--coco)',
-          marginBottom: 24,
-        }}
-      >
+      <div className="flex gap-1 border-b border-[var(--coco)] mb-4 md:mb-6 px-4 md:px-8 overflow-x-auto">
         <TabButton active={tab === 'hub'} onClick={() => setTab('hub')}>
           Mitgliederbereich
         </TabButton>
@@ -45,19 +38,12 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      style={{
-        padding: '12px 20px',
-        background: 'transparent',
-        border: 'none',
-        borderBottom: `2px solid ${active ? 'var(--berry)' : 'transparent'}`,
-        color: active ? 'var(--berry)' : 'var(--color-text-secondary)',
-        fontFamily: 'var(--font-sans)',
-        fontSize: 14,
-        fontWeight: 700,
-        letterSpacing: '0.3px',
-        cursor: 'pointer',
-        textTransform: 'uppercase',
-      }}
+      className={`px-4 md:px-5 py-3 bg-transparent border-0 border-b-2 text-xs md:text-sm font-bold uppercase tracking-wide cursor-pointer whitespace-nowrap transition-colors ${
+        active
+          ? 'border-[var(--berry)] text-[var(--berry)]'
+          : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--berry)]'
+      }`}
+      style={{ fontFamily: 'var(--font-sans)' }}
     >
       {children}
     </button>

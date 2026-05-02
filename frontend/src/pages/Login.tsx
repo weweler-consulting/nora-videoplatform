@@ -51,7 +51,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--nora-warm)]">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--nora-warm)] px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
           <img src="/nw-logo.webp" alt="Nora Weweler" className="w-16 h-16 mb-3" />
@@ -61,7 +61,7 @@ export default function Login() {
 
         {forgotMode ? (
           forgotSent ? (
-            <div className="bg-white rounded-2xl shadow-sm p-8 text-center space-y-4">
+            <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 text-center space-y-4">
               <div className="text-green-600 text-sm font-medium">
                 Falls ein Konto mit dieser E-Mail existiert, wurde ein Link zum Zurücksetzen gesendet.
               </div>
@@ -74,7 +74,7 @@ export default function Login() {
               </button>
             </div>
           ) : (
-            <form onSubmit={handleForgot} className="bg-white rounded-2xl shadow-sm p-8 space-y-5">
+            <form onSubmit={handleForgot} className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 space-y-5">
               <h2 className="text-base font-semibold text-gray-800 text-center">Passwort vergessen?</h2>
               <p className="text-sm text-gray-500 text-center">
                 Gib deine E-Mail-Adresse ein und wir senden dir einen Link zum Zurücksetzen.
@@ -116,7 +116,7 @@ export default function Login() {
             </form>
           )
         ) : (
-          <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-8 space-y-5">
+          <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-6 sm:p-8 space-y-5">
             {sessionExpired && !error && (
               <div className="bg-amber-50 text-amber-700 text-sm px-4 py-3 rounded-lg">
                 Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.
@@ -173,7 +173,7 @@ export default function Login() {
         )}
       </div>
 
-      <footer className="fixed bottom-0 inset-x-0 py-4 text-center text-xs text-gray-400 space-x-3">
+      <footer className="fixed bottom-0 inset-x-0 py-3 text-center text-xs text-gray-400 space-x-2 sm:space-x-3 px-2 bg-[var(--nora-warm)]/80 backdrop-blur-sm">
         <a href="https://noraweweler.de" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--nora-pink)] transition-colors">noraweweler.de</a>
         <span>·</span>
         <a href="https://noraweweler.de/impressum" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--nora-pink)] transition-colors">Impressum</a>

@@ -33,7 +33,7 @@ export default function HubView({ courseId }: { courseId: string }) {
   }
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto' }}>
+    <div className="max-w-[960px] mx-auto px-4 md:px-8 pb-8">
       <h1 style={{
         fontFamily: 'var(--font-sans)', fontWeight: 800, fontSize: 22,
         textTransform: 'uppercase', letterSpacing: '-0.3px',
