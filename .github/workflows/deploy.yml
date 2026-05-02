@@ -49,7 +49,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Cloudron CLI
-        run: npm install -g cloudron
+        run: npm install -g cloudron@8.2.2
       - name: Check if app is installed
         id: check-app
         env:
