@@ -159,13 +159,16 @@ export default function LessonView() {
       {/* Lesson title */}
       <h2 className="text-lg md:text-xl font-semibold mb-4 md:mb-6">{currentLesson.title}</h2>
 
-      {/* Video player */}
+      {/* Video player — border-radius on the iframe itself; clipping the parent
+          breaks Bunny/<video> layer compositing on iOS Safari (black frame with
+          controls visible). */}
       {currentLesson.video_url ? (
-        <div className="aspect-video bg-black rounded-2xl overflow-hidden mb-4 md:mb-6">
+        <div className="aspect-video bg-black rounded-2xl mb-4 md:mb-6">
           <iframe
             src={currentLesson.video_url.replace('player.mediadelivery.net', 'iframe.mediadelivery.net')}
             title={currentLesson.title}
-            className="w-full h-full border-0"
+            className="w-full h-full block rounded-2xl"
+            style={{ border: 0 }}
             allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
             allowFullScreen
           />
