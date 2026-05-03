@@ -12,7 +12,12 @@ Eine Liste. Hier weitermachen, wenn du Zeit hast. Erledigte Punkte abhaken, nich
 
 ## 📍 Hier morgen weitermachen
 
-**Plattform-Stand:** Live auf `kose.noraweweler.de`. Go-Live-Audit durch. CRM-Anbindung an `crm.noraweweler.de` live, inkl. Status-Sync. Nächster Brocken: **B2 Zertifikat**.
+**Plattform-Stand:** Live auf `kose.noraweweler.de`. Go-Live-Audit durch. CRM-Anbindung an `crm.noraweweler.de` live, inkl. Status-Sync. Mitgliederbereich-Feature (Hub pro Kurs) seit 2026-04-24 deployed. **2026-04-27 abends: erste zahlende Kundinnen eingeladen.** Nächster Brocken: **B2 Zertifikat** — sobald die erste Kohorte stabil läuft.
+
+**Erstes Cohort-Monitoring (24–48h):**
+- Resend-Dashboard: Bounces / Spam-Reports der Invite-Mails prüfen
+- Nora kurz mit 1–2 Kundinnen rückkoppeln: Login + erste Lektion erfolgreich? Mitgliederbereich verständlich?
+- Server-Logs grep'en: 5xx-Errors, fehlgeschlagene Bunny-Calls, Webhook-Probleme
 
 **Warum B2 als Nächstes:** kleinster sichtbarer Kunden-Effekt pro Aufwand. 2–3 Tage bis deploy-bar. Treiber: Social-Proof (Kundinnen teilen PDF auf Instagram → kostenlose Werbung), plus Abschluss-Motivation (niemand will bei 80 % steckenbleiben).
 
@@ -92,6 +97,7 @@ Was aus PM-Sicht direkt Umsatz oder Retention bringt. Reihenfolge ist meine Empf
 - [ ] **Password-Reset-Token als "used" markieren** — `app/api/auth.py`. Defense-in-depth.
 - [ ] **Session-Invalidation bei Passwort-Change** — `change_password`-Endpoint. Fix: `token_version` auf User, im JWT-Claim.
 - [ ] **Bunny-Upload: File-Type + Size-Validation** — `app/api/upload.py`. Beschränken: nur `video/*`, max N GB.
+- [ ] **Bunny Token Authentication für Video-Playback** — Aktuell ist die Bunny-Library auf "Block direct url file access = OFF" weil das auf iOS Safari/Chrome den Stream sonst blockt (siehe Incident 2026-05-03). Folge: jemand mit der CDN-URL kann das Video ohne Login abspielen. Sauberer Fix: signed URLs mit kurzer Ablaufzeit. Ablauf: Backend generiert pro Lektion+User einen Token (HMAC mit `BUNNY_TOKEN_AUTH_KEY`, expires=jetzt+1h, optional IP-Bind), Frontend bekommt embed-URL mit `?token=...&expires=...`. In Bunny dann "Token Authentication" wieder ON. Refresh-Logik klären (langer Video, Token läuft mitten ab).
 - [ ] **Security-Header in nginx.conf** — X-Frame-Options, X-Content-Type-Options, CSP. Cloudron setzt nur HSTS.
 
 ---
@@ -123,6 +129,7 @@ Was aus PM-Sicht direkt Umsatz oder Retention bringt. Reihenfolge ist meine Empf
 - Template-Engine (Jinja2) statt f-Strings für E-Mail-HTML
 - Dev-Mode `MAIL_MOCK=true` für lokales Testen ohne echten Versand
 - Quiz/Tests, Aufgaben/Submissions, Kommentare pro Lektion — **explizit nicht priorisiert** (siehe deep-audit PM-Kritik). Nur bauen wenn echte Nachfrage aufkommt.
+- Admin: Lektionen innerhalb eines Kurses per Drag-and-Drop verschiebbar machen. Datenmodell hat schon `sort_order` (siehe A23) — UI in `AdminCourseDetail.tsx`/`AdminModuleDetail.tsx` plus Bulk-Update-Endpoint, der die neue Reihenfolge persistiert.
 
 ---
 
@@ -144,6 +151,26 @@ CRM ↔ Kurse Integration (2026-04-21):
 - ✅ CourseInvitation-Modell + Contact-Kurse-Sektion + Historie (CRM `98dd6d1`)
 - ✅ Accept-Status-Sync (Lookup-Endpoint Kurse `9ad58bb` · Status-Pull CRM `d6f5cd3`)
 - ✅ R1 Lookup case-insensitive (Kurse `26e4a5f`) · R2 Historie-Label · R3 Copy-Link nur neueste (CRM `520e6fa`)
+
+---
+
+## Session-Notes 2026-04-27
+
+**Milestone:** Erste zahlende Kundinnen eingeladen.
+
+**Pre-Launch-Check (heute Abend):**
+- Code-Stand sauber: Auth/Invite-Flow geprüft (`app/api/auth.py`, `app/core/auth.py`, `seed.py`). Kein hardcoded `admin123` mehr — Admin nur via ENV-Vars `NORA_ADMIN_EMAIL`/`NORA_ADMIN_PASSWORD` (min 8 chars). Invite-Token: `secrets.token_urlsafe(32)`, 7d TTL. Forgot-Password resendet Invite wenn noch nicht akzeptiert. Login blockiert solange `invite_token` gesetzt ist.
+- Mitgliederbereich-Feature (Merge 2026-04-24) seit 3 Tagen live. Default-Tab nach Login: `Mitgliederbereich`. Hubs für die heute verkauften Kurse befüllt, Bunny-Storage-ENV-Vars (`BUNNY_STORAGE_ZONE/KEY/PULL_ZONE`) gesetzt.
+- Cloudron-Operations: Default-Admin / Test-Student bereits entfernt.
+- E2E-Test (Invite → Mail → Accept → Lesson) durchgelaufen.
+- Stripe-Direktkauf bewusst out-of-scope für diesen Launch (manuelle Invites über Admin-UI).
+
+**Bewusst NICHT vor Launch angefasst** (alles im Backlog, kein akutes Risiko):
+- Security-Härtung: JWT-TTL 7d, PBKDF2 → bcrypt, JWT in HttpOnly-Cookie, Reset-Token-„used"-Flag, Session-Invalidation bei Passwort-Change.
+- Sentry / Alembic / Source-Maps-aus.
+- A13–A27 Bug-Hygiene.
+
+**Nach 24–48h checken:** siehe „Hier morgen weitermachen".
 
 ---
 

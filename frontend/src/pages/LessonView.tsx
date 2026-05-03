@@ -173,31 +173,16 @@ export default function LessonView() {
           video inline instead of trying to enter native fullscreen, which fails
           inside the iframe and leaves the frame black. */}
       {currentLesson.video_url ? (
-        <>
-          <div className="aspect-video bg-black rounded-2xl mb-2">
-            <iframe
-              src={withPlayerParams(currentLesson.video_url)}
-              title={currentLesson.title}
-              className="w-full h-full block rounded-2xl"
-              style={{ border: 0 }}
-              allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
-              allowFullScreen
-            />
-          </div>
-          {/* DEBUG (temp): direct link to the bare Bunny embed URL — used to
-              isolate whether iOS playback issues are in our wrapper or in the
-              Bunny library config. Remove after diagnosis. */}
-          <div className="text-xs text-gray-400 mb-4 md:mb-6 break-all">
-            <a
-              href={withPlayerParams(currentLesson.video_url)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-[var(--nora-pink-dark)]"
-            >
-              Diagnose: Video direkt im Browser öffnen
-            </a>
-          </div>
-        </>
+        <div className="aspect-video bg-black rounded-2xl mb-4 md:mb-6">
+          <iframe
+            src={withPlayerParams(currentLesson.video_url)}
+            title={currentLesson.title}
+            className="w-full h-full block rounded-2xl"
+            style={{ border: 0 }}
+            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+          />
+        </div>
       ) : (
         <div className="aspect-video bg-gray-100 rounded-2xl flex items-center justify-center mb-4 md:mb-6 text-gray-400">
           Kein Video vorhanden
