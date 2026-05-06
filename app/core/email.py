@@ -134,13 +134,13 @@ def send_invite_email(
     if not config:
         return False
 
-    subject = f"Einladung zum Kurs \"{course_title}\""
+    subject = f"Dein Zugang zum {course_title} ist da"
 
     text = f"""Hallo {to_name},
 
-du wurdest zum Kurs "{course_title}" eingeladen!
+dein Zugang zum {course_title} ist bereit.
 
-Um deinen Zugang zu aktivieren, klicke bitte auf den folgenden Link. Dort kannst du dein Passwort festlegen und den AGB sowie der Datenschutzerklaerung zustimmen:
+Klick auf den Button unten, vergib dein persoenliches Passwort, und du bist drin.
 
 {invite_url}
 
@@ -152,8 +152,8 @@ Liebe Gruesse
 Nora"""
 
     body_html = f"""<p style="margin: 0 0 16px 0;">Hallo {to_name},</p>
-<p style="margin: 0 0 16px 0;">du wurdest zum Kurs <strong>&quot;{course_title}&quot;</strong> eingeladen!</p>
-<p style="margin: 0 0 8px 0;">Um deinen Zugang zu aktivieren, klicke auf den Button unten. Dort kannst du dein Passwort festlegen und den AGB &amp; der Datenschutzerkl&auml;rung zustimmen.</p>
+<p style="margin: 0 0 16px 0;">dein Zugang zum <strong>{course_title}</strong> ist bereit. 🌱</p>
+<p style="margin: 0 0 8px 0;">Klick auf den Button unten, vergib dein pers&ouml;nliches Passwort, und du bist drin.</p>
 {_cta_button(invite_url, "Einladung annehmen")}
 <p style="margin: 0 0 8px 0; color: #888; font-size: 13px;">Der Link ist 7 Tage g&uuml;ltig.</p>
 <p style="margin: 0 0 16px 0; color: #888; font-size: 13px;">Falls der Button nicht funktioniert, kopiere diese Adresse in deinen Browser:<br><a href="{invite_url}" style="color: #D47479; word-break: break-all;">{invite_url}</a></p>
