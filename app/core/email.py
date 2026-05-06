@@ -149,7 +149,9 @@ Der Link ist 7 Tage gueltig.
 Falls du diese Einladung nicht erwartet hast, kannst du diese E-Mail ignorieren.
 
 Liebe Gruesse
-Nora"""
+Nora
+
+P.S. Deinen Kurs erreichst du jederzeit unter kurse.noraweweler.de - speichere dir die Adresse gleich als Lesezeichen."""
 
     body_html = f"""<p style="margin: 0 0 16px 0;">Hallo {to_name},</p>
 <p style="margin: 0 0 16px 0;">dein Zugang zum <strong>{course_title}</strong> ist bereit. 🌱</p>
@@ -158,7 +160,8 @@ Nora"""
 <p style="margin: 0 0 8px 0; color: #888; font-size: 13px;">Der Link ist 7 Tage g&uuml;ltig.</p>
 <p style="margin: 0 0 16px 0; color: #888; font-size: 13px;">Falls der Button nicht funktioniert, kopiere diese Adresse in deinen Browser:<br><a href="{invite_url}" style="color: #D47479; word-break: break-all;">{invite_url}</a></p>
 <p style="margin: 24px 0 16px 0; color: #aaa; font-size: 12px;">Falls du diese Einladung nicht erwartet hast, kannst du diese E-Mail ignorieren.</p>
-<p style="margin: 0;">Liebe Gr&uuml;&szlig;e<br>Nora</p>"""
+<p style="margin: 0 0 16px 0;">Liebe Gr&uuml;&szlig;e<br>Nora</p>
+<p style="margin: 24px 0 0 0; padding: 14px 18px; background-color: #fdf2f4; border-left: 3px solid #D47479; font-size: 13px; color: #555; line-height: 1.65;"><strong style="color: #303030;">P.S.</strong> Deinen Kurs erreichst du jederzeit unter <a href="https://kurse.noraweweler.de" style="color: #D47479; font-weight: 700; text-decoration: none;">kurse.noraweweler.de</a> &mdash; speichere dir die Adresse gleich als Lesezeichen.</p>"""
 
     html = _wrap_in_brand_template(body_html)
 
@@ -186,6 +189,49 @@ def _send_smtp(config: dict, msg: MIMEMultipart):
                 pass  # Cloudron internal SMTP on port 2525 doesn't need TLS
             smtp.login(config["username"], config["password"])
             smtp.send_message(msg)
+
+
+def send_course_added_email(
+    to_email: str,
+    to_name: str,
+    course_title: str,
+    login_url: str,
+) -> bool:
+    """Notify an existing, activated user that a new course has been added to their account."""
+    config = get_smtp_config()
+    if not config:
+        return False
+
+    subject = f"Dein neuer Kurs {course_title} ist freigeschaltet"
+
+    text = f"""Hallo {to_name},
+
+dein neuer Kurs {course_title} ist ab sofort in deinem Account verfuegbar.
+
+Logg dich einfach ein und leg los:
+{login_url}
+
+Liebe Gruesse
+Nora"""
+
+    body_html = f"""<p style="margin: 0 0 16px 0;">Hallo {to_name},</p>
+<p style="margin: 0 0 16px 0;">dein neuer Kurs <strong>{course_title}</strong> ist ab sofort in deinem Account verf&uuml;gbar. 🌱</p>
+<p style="margin: 0 0 8px 0;">Logg dich einfach ein und leg los:</p>
+{_cta_button(login_url, "Jetzt einloggen")}
+<p style="margin: 0 0 16px 0; color: #888; font-size: 13px;">Falls der Button nicht funktioniert: <a href="{login_url}" style="color: #D47479;">{login_url}</a></p>
+<p style="margin: 24px 0 0 0;">Liebe Gr&uuml;&szlig;e<br>Nora</p>"""
+
+    html = _wrap_in_brand_template(body_html)
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = config["from_addr"]
+    msg["To"] = to_email
+    msg.attach(MIMEText(text, "plain", "utf-8"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    _send_smtp(config, msg)
+    return True
 
 
 def send_module_unlocked_email(

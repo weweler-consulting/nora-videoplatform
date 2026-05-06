@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base, async_session
-from app.core.email import send_invite_email
+from app.core.email import send_invite_email, send_course_added_email
 from app.core.time import utc_now
 from app.models.user import User
 from app.models.course import Course, Enrollment
@@ -228,4 +228,11 @@ async def _handle_checkout_completed(session: dict, request: Request):
             except Exception as e:
                 logger.error(f"Failed to send invite email to {customer_email}: {e}")
         elif not needs_invite and enrolled_courses:
-            logger.info(f"Existing user {customer_email} enrolled in: {[c.title for c in enrolled_courses]}")
+            base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
+            login_url = f"{base}/login"
+            course_titles = ", ".join(c.title for c in enrolled_courses)
+            try:
+                send_course_added_email(customer_email, user.name, course_titles, login_url)
+                logger.info(f"Course-added email sent to {customer_email} for: {course_titles}")
+            except Exception as e:
+                logger.error(f"Failed to send course-added email to {customer_email}: {e}")
