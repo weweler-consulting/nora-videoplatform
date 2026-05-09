@@ -1,18 +1,38 @@
 // Moved verbatim from src/pages/CourseView.tsx. The outer CourseView now
 // picks this component (lessons tab) or HubView (hub tab) based on ?tab=.
 
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { api, type CourseDetail, type ModuleItem } from '../../lib/api';
 
-function ModuleCard({ module, courseId }: { module: ModuleItem; courseId: string }) {
-  const [expanded, setExpanded] = useState(false);
+function ModuleCard({
+  module,
+  courseId,
+  defaultExpanded = false,
+  scrollOnMount = false,
+}: {
+  module: ModuleItem;
+  courseId: string;
+  defaultExpanded?: boolean;
+  scrollOnMount?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollOnMount && cardRef.current) {
+      cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    // Only on first mount when the hint applies; module IDs are stable per card.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const percent = module.total_lessons > 0
     ? Math.round((module.completed_lessons / module.total_lessons) * 100)
     : 0;
 
   return (
-    <div className={`bg-white rounded-2xl shadow-sm overflow-hidden ${module.is_locked ? 'opacity-60' : ''}`}>
+    <div ref={cardRef} className={`bg-white rounded-2xl shadow-sm overflow-hidden ${module.is_locked ? 'opacity-60' : ''}`}>
       {/* Module header */}
       <button
         onClick={() => !module.is_locked && setExpanded(!expanded)}
@@ -107,6 +127,8 @@ function ModuleCard({ module, courseId }: { module: ModuleItem; courseId: string
 
 export default function CourseLessons() {
   const { courseId } = useParams<{ courseId: string }>();
+  const [searchParams] = useSearchParams();
+  const fromLessonId = searchParams.get('lesson');
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -115,6 +137,18 @@ export default function CourseLessons() {
       api.getCourse(courseId).then(setCourse).finally(() => setLoading(false));
     }
   }, [courseId]);
+
+  // Module that contains the lesson the user just came back from — used to
+  // auto-expand and scroll into view so the user lands where they came from.
+  const expandedModuleId = useMemo(() => {
+    if (!fromLessonId || !course) return null;
+    for (const mod of course.modules) {
+      for (const sec of mod.sections) {
+        if (sec.lessons.some((l) => l.id === fromLessonId)) return mod.id;
+      }
+    }
+    return null;
+  }, [fromLessonId, course]);
 
   if (loading) {
     return (
@@ -174,9 +208,18 @@ export default function CourseLessons() {
       {/* Modules */}
       <h3 className="text-lg font-semibold mb-4">Module</h3>
       <div className="space-y-4">
-        {course.modules.map((module) => (
-          <ModuleCard key={module.id} module={module} courseId={course.id} />
-        ))}
+        {course.modules.map((module) => {
+          const isReturnTarget = module.id === expandedModuleId;
+          return (
+            <ModuleCard
+              key={module.id}
+              module={module}
+              courseId={course.id}
+              defaultExpanded={isReturnTarget}
+              scrollOnMount={isReturnTarget}
+            />
+          );
+        })}
       </div>
     </div>
   );

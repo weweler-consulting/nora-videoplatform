@@ -127,7 +127,7 @@ export default function LessonView() {
           Meine Kurse
         </Link>
         <span>/</span>
-        <Link to={`/course/${courseId}`} className="hover:text-[var(--nora-pink-dark)] transition-colors">
+        <Link to={`/course/${courseId}?tab=lessons&lesson=${lessonId}`} className="hover:text-[var(--nora-pink-dark)] transition-colors">
           {course.title}
         </Link>
         <span>/</span>
@@ -138,7 +138,7 @@ export default function LessonView() {
 
       {/* Back link — mobile */}
       <Link
-        to={`/course/${courseId}`}
+        to={`/course/${courseId}?tab=lessons&lesson=${lessonId}`}
         className="md:hidden inline-flex items-center gap-2 text-sm text-gray-500 mb-4 hover:text-[var(--nora-pink-dark)]"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -149,7 +149,7 @@ export default function LessonView() {
 
       {/* Module header bar — clickable back to course */}
       <Link
-        to={`/course/${courseId}`}
+        to={`/course/${courseId}?tab=lessons&lesson=${lessonId}`}
         className="bg-gradient-to-r from-[var(--nora-pink)] to-[var(--nora-pink-dark)] rounded-2xl p-4 md:p-5 mb-4 md:mb-6 flex items-center justify-between text-white group hover:opacity-95 transition-opacity gap-3"
       >
         <div className="flex items-center gap-3 min-w-0">
