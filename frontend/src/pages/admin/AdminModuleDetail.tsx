@@ -90,6 +90,17 @@ export default function AdminModuleDetail() {
     load();
   };
 
+  const handleMove = async (idx: number, direction: -1 | 1) => {
+    const current = allLessons[idx];
+    const neighbor = allLessons[idx + direction];
+    if (!current || !neighbor || current.sectionId !== neighbor.sectionId) return;
+    await Promise.all([
+      api.updateLesson(current.id, { sort_order: neighbor.sort_order }),
+      api.updateLesson(neighbor.id, { sort_order: current.sort_order }),
+    ]);
+    load();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -198,6 +209,30 @@ export default function AdminModuleDetail() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-4">
+                      <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                        <button
+                          onClick={() => handleMove(idx, -1)}
+                          disabled={idx === 0 || allLessons[idx - 1]?.sectionId !== lesson.sectionId}
+                          className="px-2 py-1.5 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          title="Nach oben"
+                          aria-label="Nach oben verschieben"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => handleMove(idx, 1)}
+                          disabled={idx === allLessons.length - 1 || allLessons[idx + 1]?.sectionId !== lesson.sectionId}
+                          className="px-2 py-1.5 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors border-l border-gray-200"
+                          title="Nach unten"
+                          aria-label="Nach unten verschieben"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
                       <button
                         onClick={() => handleStartEdit(lesson)}
                         className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
