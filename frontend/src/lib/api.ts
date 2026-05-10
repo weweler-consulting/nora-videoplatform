@@ -323,6 +323,7 @@ export interface CourseDetail {
   is_active: boolean;
   sort_order: number;
   stripe_product_id: string | null;
+  hub_enabled: boolean;
   created_at: string;
   modules: ModuleItem[];
   total_lessons: number;

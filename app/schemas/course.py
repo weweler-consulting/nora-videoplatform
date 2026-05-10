@@ -9,6 +9,7 @@ class CourseBase(BaseModel):
     image_url: Optional[str] = None
     is_active: bool = True
     sort_order: int = 0
+    hub_enabled: bool = True
 
 
 class CourseCreate(CourseBase):
@@ -22,6 +23,7 @@ class CourseUpdate(BaseModel):
     is_active: Optional[bool] = None
     sort_order: Optional[int] = None
     stripe_product_id: Optional[str] = None
+    hub_enabled: Optional[bool] = None
 
 
 class LessonOut(BaseModel):
@@ -64,6 +66,7 @@ class CourseOut(BaseModel):
     is_active: bool
     sort_order: int
     stripe_product_id: Optional[str] = None
+    hub_enabled: bool = True
     created_at: datetime
     modules: list[ModuleOut] = []
     total_lessons: int = 0

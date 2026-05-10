@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { api, type CourseDetail, type ModuleItem } from '../../lib/api';
+import { type CourseDetail, type ModuleItem } from '../../lib/api';
 
 function ModuleCard({
   module,
@@ -125,23 +125,15 @@ function ModuleCard({
   );
 }
 
-export default function CourseLessons() {
+export default function CourseLessons({ course }: { course: CourseDetail }) {
   const { courseId } = useParams<{ courseId: string }>();
   const [searchParams] = useSearchParams();
   const fromLessonId = searchParams.get('lesson');
-  const [course, setCourse] = useState<CourseDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (courseId) {
-      api.getCourse(courseId).then(setCourse).finally(() => setLoading(false));
-    }
-  }, [courseId]);
 
   // Module that contains the lesson the user just came back from — used to
   // auto-expand and scroll into view so the user lands where they came from.
   const expandedModuleId = useMemo(() => {
-    if (!fromLessonId || !course) return null;
+    if (!fromLessonId) return null;
     for (const mod of course.modules) {
       for (const sec of mod.sections) {
         if (sec.lessons.some((l) => l.id === fromLessonId)) return mod.id;
@@ -149,18 +141,6 @@ export default function CourseLessons() {
     }
     return null;
   }, [fromLessonId, course]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--nora-pink)]" />
-      </div>
-    );
-  }
-
-  if (!course) {
-    return <div className="p-4 md:p-8 text-gray-500">Kurs nicht gefunden.</div>;
-  }
 
   return (
     <div className="p-4 md:p-8 max-w-4xl">

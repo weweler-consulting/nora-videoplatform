@@ -55,6 +55,7 @@ def _build_migration_statements() -> list[str]:
         "CREATE INDEX IF NOT EXISTS ix_users_reset_token ON users (reset_token)",
         "ALTER TABLE modules ADD COLUMN unlock_after_days INTEGER DEFAULT 0 NOT NULL",
         "ALTER TABLE courses ADD COLUMN stripe_product_id VARCHAR",
+        "ALTER TABLE courses ADD COLUMN hub_enabled BOOLEAN DEFAULT TRUE NOT NULL",
     ]
     # Re-create FK constraints with ON DELETE CASCADE (A3 from audit)
     for child, col, parent in _FK_CASCADES:

@@ -1,10 +1,40 @@
+import { useEffect, useState } from 'react';
 import { useSearchParams, useParams } from 'react-router-dom';
+import { api, type CourseDetail } from '../lib/api';
 import CourseLessons from './course/CourseLessons';
 import HubView from './course/hub/HubView';
 
 export default function CourseView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { courseId } = useParams();
+  const [course, setCourse] = useState<CourseDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!courseId) return;
+    setLoading(true);
+    api.getCourse(courseId)
+      .then(setCourse)
+      .catch(() => setCourse(null))
+      .finally(() => setLoading(false));
+  }, [courseId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--nora-pink)]" />
+      </div>
+    );
+  }
+
+  if (!course) {
+    return <div className="p-4 md:p-8 text-gray-500">Kurs nicht gefunden.</div>;
+  }
+
+  if (!course.hub_enabled) {
+    return <CourseLessons course={course} />;
+  }
+
   const tab = searchParams.get('tab') === 'lessons' ? 'lessons' : 'hub';
 
   const setTab = (t: 'hub' | 'lessons') => {
@@ -26,7 +56,7 @@ export default function CourseView() {
       {tab === 'hub' ? (
         <HubView courseId={courseId!} />
       ) : (
-        <CourseLessons />
+        <CourseLessons course={course} />
       )}
     </div>
   );

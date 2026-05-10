@@ -18,6 +18,7 @@ class Course(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     stripe_product_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    hub_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     modules = relationship("Module", back_populates="course", order_by="Module.sort_order", cascade="all, delete-orphan")

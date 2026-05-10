@@ -91,21 +91,24 @@ export default function AdminCourseDetail() {
           />
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <Link
-            to={`/admin/course/${courseId}/hub`}
-            style={{
-              padding: '8px 18px',
-              borderRadius: 'var(--radius-pill)',
-              background: 'var(--berry)',
-              color: '#fff',
-              textDecoration: 'none',
-              fontSize: 13,
-              fontWeight: 700,
-              letterSpacing: '0.3px',
-            }}
-          >
-            Mitgliederbereich bearbeiten
-          </Link>
+          <HubEnabledToggle courseId={course.id} initial={course.hub_enabled} onChange={load} />
+          {course.hub_enabled && (
+            <Link
+              to={`/admin/course/${courseId}/hub`}
+              style={{
+                padding: '8px 18px',
+                borderRadius: 'var(--radius-pill)',
+                background: 'var(--berry)',
+                color: '#fff',
+                textDecoration: 'none',
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: '0.3px',
+              }}
+            >
+              Mitgliederbereich bearbeiten
+            </Link>
+          )}
           <button
             onClick={() => setShowCreate(!showCreate)}
             className="px-4 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors"
@@ -204,6 +207,45 @@ export default function AdminCourseDetail() {
         </div>
       )}
     </div>
+  );
+}
+
+function HubEnabledToggle({ courseId, initial, onChange }: { courseId: string; initial: boolean; onChange: () => void }) {
+  const [enabled, setEnabled] = useState(initial);
+  const [saving, setSaving] = useState(false);
+
+  const toggle = async () => {
+    const next = !enabled;
+    setEnabled(next);
+    setSaving(true);
+    try {
+      await api.updateCourse(courseId, { hub_enabled: next });
+      onChange();
+    } catch {
+      setEnabled(!next);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      disabled={saving}
+      aria-pressed={enabled}
+      title="Mitgliederbereich-Tab im Kurs anzeigen"
+      className={`flex items-center gap-2 text-sm text-gray-600 select-none bg-transparent border-0 p-0 cursor-pointer ${saving ? 'opacity-60' : ''}`}
+    >
+      <span
+        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${enabled ? 'bg-[var(--berry)]' : 'bg-gray-300'}`}
+      >
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-4' : 'translate-x-0.5'}`}
+        />
+      </span>
+      <span>Mitgliederbereich</span>
+    </button>
   );
 }
 
