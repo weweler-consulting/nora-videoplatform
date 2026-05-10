@@ -49,7 +49,40 @@ async def stripe_webhook(request: Request):
     except stripe.error.SignatureVerificationError:
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    # Idempotency: claim the event ID first, skip if already processed
+    # PRE-CHECK vor dem Idempotenz-Claim: wenn wir das Event ohnehin nicht
+    # verarbeiten würden (z.B. unbekanntes Produkt, nicht-relevanter Event-Type),
+    # soll der Resend nach einem Fix funktionieren statt als "already processed"
+    # geskipped zu werden.
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        try:
+            line_items = stripe.checkout.Session.list_line_items(session["id"], limit=10)
+        except Exception as e:
+            logger.error(f"Stripe API failed for session {session['id']}: {e}")
+            raise HTTPException(status_code=500, detail="Stripe API failed")
+        product_ids = [
+            (item.get("price") or {}).get("product")
+            for item in line_items.get("data", [])
+        ]
+        product_ids = [p for p in product_ids if p]
+        if not product_ids:
+            logger.error(f"No products in session {session['id']} — not claiming event")
+            return {"ok": True, "ignored": "no_products"}
+        async with async_session() as check_db:
+            result = await check_db.execute(
+                select(Course).where(Course.stripe_product_id.in_(product_ids))
+            )
+            if not result.scalars().first():
+                logger.error(
+                    f"No courses match Stripe product IDs {product_ids} — not claiming event "
+                    f"(resend after fix possible)"
+                )
+                return {"ok": True, "ignored": "no_match"}
+    elif event["type"] not in ("charge.refunded",):
+        logger.info(f"Unhandled Stripe event type: {event['type']} — not claiming")
+        return {"ok": True, "ignored": "unhandled_type"}
+
+    # Idempotency: claim the event ID. Skip if already processed.
     async with async_session() as db:
         db.add(StripeProcessedEvent(event_id=event["id"]))
         try:
@@ -59,11 +92,9 @@ async def stripe_webhook(request: Request):
             return {"ok": True, "duplicate": True}
 
     if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
-        await _handle_checkout_completed(session, request)
+        await _handle_checkout_completed(event["data"]["object"], request)
     elif event["type"] == "charge.refunded":
-        charge = event["data"]["object"]
-        await _handle_refund(charge)
+        await _handle_refund(event["data"]["object"])
 
     return {"ok": True}
 
