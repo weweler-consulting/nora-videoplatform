@@ -94,10 +94,20 @@ export default function AdminModuleDetail() {
     const current = allLessons[idx];
     const neighbor = allLessons[idx + direction];
     if (!current || !neighbor || current.sectionId !== neighbor.sectionId) return;
-    await Promise.all([
-      api.updateLesson(current.id, { sort_order: neighbor.sort_order }),
-      api.updateLesson(neighbor.id, { sort_order: current.sort_order }),
-    ]);
+
+    const sectionLessons = allLessons.filter((l) => l.sectionId === current.sectionId);
+    const fromLocal = sectionLessons.findIndex((l) => l.id === current.id);
+    const toLocal = fromLocal + direction;
+    if (toLocal < 0 || toLocal >= sectionLessons.length) return;
+
+    const reordered = [...sectionLessons];
+    [reordered[fromLocal], reordered[toLocal]] = [reordered[toLocal], reordered[fromLocal]];
+
+    await Promise.all(
+      reordered.map((l, i) =>
+        l.sort_order === i ? null : api.updateLesson(l.id, { sort_order: i })
+      ).filter(Boolean)
+    );
     load();
   };
 
