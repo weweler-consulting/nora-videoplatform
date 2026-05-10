@@ -2,7 +2,7 @@
 // picks this component (lessons tab) or HubView (hub tab) based on ?tab=.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { type CourseDetail, type ModuleItem } from '../../lib/api';
 
 function ModuleCard({
@@ -126,7 +126,6 @@ function ModuleCard({
 }
 
 export default function CourseLessons({ course }: { course: CourseDetail }) {
-  const { courseId } = useParams<{ courseId: string }>();
   const [searchParams] = useSearchParams();
   const fromLessonId = searchParams.get('lesson');
 
