@@ -1054,7 +1054,7 @@ Falls bereits ein Dialog im Code verwendet wird, sein Pattern als Vorlage nutzen
 ```tsx
 import { useEffect, useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import { X, Users } from 'lucide-react';
 import {
   api,
   type AnnouncementCreateResult,
@@ -1222,8 +1222,9 @@ export default function AnnouncementComposeModal({
             </div>
 
             {recipientCount !== null && (
-              <p className="text-sm text-gray-600">
-                📬 Wird an <strong>{recipientCount}</strong>{' '}
+              <p className="text-sm text-gray-600 flex items-center gap-2">
+                <Users size={14} />
+                Wird an <strong>{recipientCount}</strong>{' '}
                 {recipientCount === 1 ? 'Teilnehmerin' : 'Teilnehmerinnen'} gesendet.
               </p>
             )}
@@ -1422,11 +1423,14 @@ import AdminCourseAnnouncements from './pages/admin/AdminCourseAnnouncements';
 Inspect `AdminCourseDetail.tsx` und finde die Stelle, wo „Hub" / „Inhalte" / „Teilnehmerinnen" als Links/Tabs angezeigt werden (vermutlich oberhalb der Module-Liste). Füge dort einen Link zur neuen Page hinzu:
 
 ```tsx
+import { Megaphone } from 'lucide-react';
+
 <Link
   to={`/admin/course/${courseId}/announcements`}
-  className="text-sm text-[var(--nora-pink)] hover:underline"
+  className="text-sm text-[var(--nora-pink)] hover:underline flex items-center gap-1"
 >
-  📣 Ankündigungen
+  <Megaphone size={14} />
+  Ankündigungen
 </Link>
 ```
 
@@ -1464,6 +1468,7 @@ Identifiziere:
 Oben in der Datei:
 
 ```tsx
+import { Megaphone } from 'lucide-react';
 import AnnouncementComposeModal from '../../components/AnnouncementComposeModal';
 import { type AnnouncementTargetType } from '../../lib/api';
 ```
@@ -1484,7 +1489,8 @@ Im Modul-Header (neben dem Modul-Titel oder bei den Modul-Actions) einen kleinen
   className="text-xs text-gray-600 hover:text-[var(--nora-pink)] flex items-center gap-1"
   title="Klientinnen über dieses Modul informieren"
 >
-  📣 Ankündigen
+  <Megaphone size={14} />
+  Ankündigen
 </button>
 ```
 
@@ -1497,10 +1503,11 @@ In der Lesson-Map (neben den bestehenden Edit/Delete-Buttons):
 ```tsx
 <button
   onClick={() => setAnnounceTarget({ type: 'lesson', id: lesson.id })}
-  className="text-xs text-gray-500 hover:text-[var(--nora-pink)]"
+  className="text-gray-500 hover:text-[var(--nora-pink)]"
   title="Klientinnen über diese Lektion informieren"
+  aria-label="Lektion ankündigen"
 >
-  📣
+  <Megaphone size={14} />
 </button>
 ```
 
@@ -1562,12 +1569,12 @@ Expected: Modal schließt, neuer Eintrag erscheint in der Liste.
 
 - [ ] **Step 5: Test 3 – Modul-Shortcut**
 
-Navigiere zu `/admin/course/<id>/module/<modid>`. Klick „📣 Ankündigen" im Header.
+Navigiere zu `/admin/course/<id>/module/<modid>`. Klick auf den „Ankündigen"-Button (Megaphone-Icon) im Header.
 Expected: Modal öffnet, das passende Modul ist vorausgewählt.
 
 - [ ] **Step 6: Test 4 – Lektion-Shortcut**
 
-Bei einer Lektion in der Liste „📣" klicken.
+Bei einer Lektion in der Liste das Megaphone-Icon klicken.
 Expected: Modal öffnet, die passende Lektion ist vorausgewählt.
 
 - [ ] **Step 7: Test 5 – E-Mail-Empfang**
