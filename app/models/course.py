@@ -130,3 +130,22 @@ class LessonProgress(Base):
 
     user = relationship("User", back_populates="progress")
     lesson = relationship("Lesson", back_populates="progress")
+
+
+class Announcement(Base):
+    __tablename__ = "announcements"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    course_id: Mapped[str] = mapped_column(
+        String, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    target_type: Mapped[str] = mapped_column(String, nullable=False)  # "module" | "lesson"
+    target_id: Mapped[str] = mapped_column(String, nullable=False)  # KEIN FK – Audit bleibt nach Löschung
+    subject: Mapped[str] = mapped_column(String, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    recipient_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    created_by_user_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    sent_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
