@@ -106,6 +106,19 @@ export default function AnnouncementComposeModal({
         subject: subject.trim(),
         body: body.trim(),
       });
+
+      const { sent, failed } = result.delivery_summary;
+      if (failed > 0) {
+        // Refresh list so partial-send is visible, but keep modal open so Nora sees the error.
+        onSent?.(result);
+        setError(
+          sent === 0
+            ? `Versand fehlgeschlagen: Keine der ${failed} Mails konnte gesendet werden. Bitte SMTP-Konfiguration prüfen.`
+            : `Versand teilweise fehlgeschlagen: ${sent} von ${sent + failed} Mails gesendet, ${failed} fehlgeschlagen.`,
+        );
+        return;
+      }
+
       onSent?.(result);
       onOpenChange(false);
     } catch (e: unknown) {

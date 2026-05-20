@@ -177,12 +177,13 @@ P.S. Deinen Kurs erreichst du jederzeit unter kurse.noraweweler.de - speichere d
 
 
 def _send_smtp(config: dict, msg: MIMEMultipart):
+    # Timeout prevents a hung SMTP server from blocking the event loop indefinitely.
     if config["port"] == 465:
-        with smtplib.SMTP_SSL(config["server"], config["port"]) as smtp:
+        with smtplib.SMTP_SSL(config["server"], config["port"], timeout=10) as smtp:
             smtp.login(config["username"], config["password"])
             smtp.send_message(msg)
     else:
-        with smtplib.SMTP(config["server"], config["port"]) as smtp:
+        with smtplib.SMTP(config["server"], config["port"], timeout=10) as smtp:
             try:
                 smtp.starttls()
             except smtplib.SMTPNotSupportedError:

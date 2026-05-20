@@ -1,4 +1,5 @@
 """Admin endpoints for course announcements (V1: immediate send)."""
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, and_
@@ -26,6 +27,7 @@ from app.schemas.announcement import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 PLATFORM_BASE_URL = "https://kurse.noraweweler.de"
 
@@ -183,6 +185,21 @@ async def create_announcement(
             detail="Keine aktiven Teilnehmerinnen für diesen Kurs",
         )
 
+    # Persist row FIRST so the audit log survives any mid-loop crash
+    # (e.g. nginx kills the request while smtplib hangs).
+    announcement = Announcement(
+        course_id=course_id,
+        target_type=payload.target_type,
+        target_id=payload.target_id,
+        subject=payload.subject,
+        body=payload.body,
+        recipient_count=len(enrolled),
+        created_by_user_id=admin.id,
+    )
+    db.add(announcement)
+    await db.commit()
+    await db.refresh(announcement)
+
     sent = 0
     failed = 0
     for user in enrolled:
@@ -199,20 +216,18 @@ async def create_announcement(
             else:
                 failed += 1
         except Exception:
+            logger.exception(
+                "Announcement %s: send to %s raised", announcement.id, user.email
+            )
             failed += 1
 
-    announcement = Announcement(
-        course_id=course_id,
-        target_type=payload.target_type,
-        target_id=payload.target_id,
-        subject=payload.subject,
-        body=payload.body,
-        recipient_count=len(enrolled),
-        created_by_user_id=admin.id,
-    )
-    db.add(announcement)
-    await db.commit()
-    await db.refresh(announcement)
+    if failed > 0:
+        logger.warning(
+            "Announcement %s: %d sent, %d failed (check SMTP config)",
+            announcement.id,
+            sent,
+            failed,
+        )
 
     return AnnouncementCreateResponse(
         announcement=AnnouncementResponse(
