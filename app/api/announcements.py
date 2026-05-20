@@ -126,3 +126,75 @@ async def preview_announcement(
         target_title=target_title,
         target_module_title=module_title,
     )
+
+
+@router.post(
+    "/{course_id}/announcements",
+    response_model=AnnouncementCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_announcement(
+    course_id: str,
+    payload: AnnouncementCreateRequest,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> AnnouncementCreateResponse:
+    course = await _require_course(db, course_id)
+    target_title, module_title, cta_url = await _resolve_target(
+        db, course_id, payload.target_type, payload.target_id
+    )
+
+    enrolled = await _enrolled_users(db, course_id)
+    if not enrolled:
+        raise HTTPException(
+            status_code=422,
+            detail="Keine aktiven Teilnehmerinnen für diesen Kurs",
+        )
+
+    sent = 0
+    failed = 0
+    for user in enrolled:
+        try:
+            ok = send_announcement_email(
+                to_email=user.email,
+                to_name=user.name or "",
+                subject=payload.subject,
+                body_text=payload.body,
+                cta_url=cta_url,
+            )
+            if ok:
+                sent += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+
+    announcement = Announcement(
+        course_id=course_id,
+        target_type=payload.target_type,
+        target_id=payload.target_id,
+        subject=payload.subject,
+        body=payload.body,
+        recipient_count=len(enrolled),
+        created_by_user_id=admin.id,
+    )
+    db.add(announcement)
+    await db.commit()
+    await db.refresh(announcement)
+
+    return AnnouncementCreateResponse(
+        announcement=AnnouncementResponse(
+            id=announcement.id,
+            course_id=announcement.course_id,
+            target_type=announcement.target_type,  # type: ignore
+            target_id=announcement.target_id,
+            target_title=target_title,
+            target_module_title=module_title,
+            subject=announcement.subject,
+            body=announcement.body,
+            recipient_count=announcement.recipient_count,
+            sent_at=announcement.sent_at,
+            created_by=CreatedByInfo(id=admin.id, name=admin.name or ""),
+        ),
+        delivery_summary={"sent": sent, "failed": failed},
+    )
