@@ -13,6 +13,7 @@ import AdminCourses from './pages/admin/AdminCourses';
 import AdminCourseDetail from './pages/admin/AdminCourseDetail';
 import AdminModuleDetail from './pages/admin/AdminModuleDetail';
 import AdminCourseHub from './pages/admin/AdminCourseHub';
+import AdminCourseAnnouncements from './pages/admin/AdminCourseAnnouncements';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminIntegrations from './pages/admin/AdminIntegrations';
 import AdminSettings from './pages/admin/AdminSettings';
@@ -56,6 +57,7 @@ export default function App() {
                   <Route path="/admin/course/:courseId" element={<AdminCourseDetail />} />
                   <Route path="/admin/course/:courseId/module/:moduleId" element={<AdminModuleDetail />} />
                   <Route path="/admin/course/:courseId/hub" element={<AdminCourseHub />} />
+                  <Route path="/admin/course/:courseId/announcements" element={<AdminCourseAnnouncements />} />
                   <Route path="/admin/users" element={<AdminUsers />} />
                   <Route path="/admin/integrations" element={<AdminIntegrations />} />
                   <Route path="/settings" element={<AdminSettings />} />
