@@ -212,6 +212,22 @@ export const api = {
       body: JSON.stringify({ embed_url: embedUrl }),
     }),
 
+  // Announcements (admin)
+  listAnnouncements: (courseId: string) =>
+    request<{ announcements: AnnouncementItem[] }>(`/admin/courses/${courseId}/announcements`)
+      .then((r) => r.announcements),
+  previewAnnouncement: (courseId: string, targetType: AnnouncementTargetType, targetId: string) => {
+    const params = new URLSearchParams({ target_type: targetType, target_id: targetId });
+    return request<AnnouncementPreview>(
+      `/admin/courses/${courseId}/announcements/preview?${params.toString()}`,
+    );
+  },
+  createAnnouncement: (courseId: string, input: AnnouncementCreateInput) =>
+    request<AnnouncementCreateResult>(`/admin/courses/${courseId}/announcements`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
   // Integrations (service tokens)
   listServiceTokens: () =>
     request<ServiceTokenInfo[]>('/integrations/tokens'),
@@ -229,6 +245,42 @@ export interface ServiceTokenInfo {
   name: string;
   created_at: string;
   last_used_at: string | null;
+}
+
+export type AnnouncementTargetType = 'module' | 'lesson';
+
+export interface AnnouncementItem {
+  id: string;
+  course_id: string;
+  target_type: AnnouncementTargetType;
+  target_id: string;
+  target_title: string | null;
+  target_module_title: string | null;
+  subject: string;
+  body: string;
+  recipient_count: number;
+  sent_at: string;
+  created_by: { id: string; name: string } | null;
+}
+
+export interface AnnouncementPreview {
+  suggested_subject: string;
+  suggested_body: string;
+  recipient_count: number;
+  target_title: string;
+  target_module_title: string | null;
+}
+
+export interface AnnouncementCreateInput {
+  target_type: AnnouncementTargetType;
+  target_id: string;
+  subject: string;
+  body: string;
+}
+
+export interface AnnouncementCreateResult {
+  announcement: AnnouncementItem;
+  delivery_summary: { sent: number; failed: number };
 }
 
 // Types
