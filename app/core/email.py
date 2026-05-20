@@ -328,6 +328,62 @@ Nora"""
     return True
 
 
+def send_announcement_email(
+    to_email: str,
+    to_name: str,
+    subject: str,
+    body_text: str,
+    cta_url: str,
+    unsubscribe_url: str | None = None,
+) -> bool:
+    """Send an in-course announcement email. Returns True if dispatched."""
+    config = get_smtp_config()
+    if not config:
+        return False
+
+    # Convert body_text to HTML paragraphs (split on double newline = paragraph break,
+    # single newline = <br>)
+    paragraphs = []
+    for para in body_text.split("\n\n"):
+        para_clean = para.strip()
+        if not para_clean:
+            continue
+        # HTML-escape minimal + line-breaks within paragraph
+        escaped = (para_clean
+                   .replace("&", "&amp;")
+                   .replace("<", "&lt;")
+                   .replace(">", "&gt;")
+                   .replace("\n", "<br>"))
+        paragraphs.append(f'<p style="margin: 0 0 16px 0;">{escaped}</p>')
+    body_html_inner = "\n".join(paragraphs) if paragraphs else f'<p style="margin: 0 0 16px 0;">{body_text}</p>'
+
+    greeting_html = f'<p style="margin: 0 0 16px 0;">Hallo {to_name},</p>'
+    sign_off_html = '<p style="margin: 24px 0 0 0;">Liebe Gr&uuml;&szlig;e<br>Nora</p>'
+
+    body_html = (
+        f"{greeting_html}\n"
+        f"{body_html_inner}\n"
+        f"{_cta_button(cta_url, 'Jetzt ansehen')}\n"
+        f'<p style="margin: 0 0 16px 0; color: #888; font-size: 13px;">'
+        f'Falls der Button nicht funktioniert: '
+        f'<a href="{cta_url}" style="color: #D47479;">{cta_url}</a></p>\n'
+        f"{sign_off_html}"
+    )
+    html = _wrap_in_brand_template(body_html, unsubscribe_url=unsubscribe_url)
+
+    text = f"Hallo {to_name},\n\n{body_text}\n\nJetzt ansehen: {cta_url}\n\nLiebe Gruesse\nNora"
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = config["from_addr"]
+    msg["To"] = to_email
+    msg.attach(MIMEText(text, "plain", "utf-8"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    _send_smtp(config, msg)
+    return True
+
+
 def send_email_change_verification(to_email: str, to_name: str, confirm_url: str) -> bool:
     """Send verification link for an email-address change request."""
     config = get_smtp_config()
