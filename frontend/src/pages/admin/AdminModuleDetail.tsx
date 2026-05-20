@@ -1,7 +1,15 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import * as tus from 'tus-js-client';
-import { api, type CourseDetail, type LessonItem, type AttachmentItem } from '../../lib/api';
+import { Megaphone } from 'lucide-react';
+import {
+  api,
+  type CourseDetail,
+  type LessonItem,
+  type AttachmentItem,
+  type AnnouncementTargetType,
+} from '../../lib/api';
+import AnnouncementComposeModal from '../../components/AnnouncementComposeModal';
 
 export default function AdminModuleDetail() {
   const { courseId, moduleId } = useParams<{ courseId: string; moduleId: string }>();
@@ -15,6 +23,11 @@ export default function AdminModuleDetail() {
   const [formVideoUrl, setFormVideoUrl] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formDuration, setFormDuration] = useState(0);
+
+  // Announcement shortcut state
+  const [announceTarget, setAnnounceTarget] = useState<
+    { type: AnnouncementTargetType; id: string } | null
+  >(null);
 
   const load = () => {
     if (courseId) {
@@ -142,12 +155,22 @@ export default function AdminModuleDetail() {
         <div className="flex-1 min-w-0">
           <EditableModuleTitle moduleId={module.id} value={module.title} onSaved={load} />
         </div>
-        <button
-          onClick={() => { resetForm(); setShowCreate(true); }}
-          className="px-4 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors shrink-0"
-        >
-          + Neue Lektion
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setAnnounceTarget({ type: 'module', id: module.id })}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-[var(--nora-pink-dark)] transition-colors"
+            title="Klientinnen ueber dieses Modul informieren"
+          >
+            <Megaphone size={14} />
+            Ankuendigen
+          </button>
+          <button
+            onClick={() => { resetForm(); setShowCreate(true); }}
+            className="px-4 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors"
+          >
+            + Neue Lektion
+          </button>
+        </div>
       </div>
 
       {/* Create form */}
@@ -164,6 +187,19 @@ export default function AdminModuleDetail() {
           onSubmit={handleCreate}
           onCancel={resetForm}
           submitLabel="Erstellen"
+        />
+      )}
+
+      {/* Announcement modal (preselected target) */}
+      {course && courseId && (
+        <AnnouncementComposeModal
+          courseId={courseId}
+          course={course}
+          open={announceTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) setAnnounceTarget(null);
+          }}
+          preselectTarget={announceTarget}
         />
       )}
 
@@ -243,6 +279,14 @@ export default function AdminModuleDetail() {
                           </svg>
                         </button>
                       </div>
+                      <button
+                        onClick={() => setAnnounceTarget({ type: 'lesson', id: lesson.id })}
+                        className="p-1.5 text-gray-500 hover:text-[var(--nora-pink-dark)] border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                        title="Klientinnen ueber diese Lektion informieren"
+                        aria-label="Lektion ankuendigen"
+                      >
+                        <Megaphone size={14} />
+                      </button>
                       <button
                         onClick={() => handleStartEdit(lesson)}
                         className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
