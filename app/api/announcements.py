@@ -88,6 +88,38 @@ async def _enrolled_users(db: AsyncSession, course_id: str) -> list[User]:
     return list(result.scalars().all())
 
 
+async def _enrich_target_titles(
+    db: AsyncSession,
+    course_id: str,
+    rows: list[Announcement],
+) -> dict[tuple[str, str], tuple[Optional[str], Optional[str]]]:
+    """Liefert {(target_type, target_id): (target_title|None, module_title|None)}.
+
+    Liefert None-Titel falls Target inzwischen gelöscht wurde.
+    """
+    module_ids = {a.target_id for a in rows if a.target_type == "module"}
+    lesson_ids = {a.target_id for a in rows if a.target_type == "lesson"}
+
+    out: dict[tuple[str, str], tuple[Optional[str], Optional[str]]] = {}
+
+    if module_ids:
+        result = await db.execute(select(Module).where(Module.id.in_(module_ids)))
+        for m in result.scalars():
+            out[("module", m.id)] = (m.title, None)
+
+    if lesson_ids:
+        result = await db.execute(
+            select(Lesson, Module)
+            .join(Section, Lesson.section_id == Section.id)
+            .join(Module, Section.module_id == Module.id)
+            .where(Lesson.id.in_(lesson_ids))
+        )
+        for lesson, module in result.all():
+            out[("lesson", lesson.id)] = (lesson.title, module.title)
+
+    return out
+
+
 @router.get(
     "/{course_id}/announcements/preview",
     response_model=AnnouncementPreviewResponse,
@@ -198,3 +230,54 @@ async def create_announcement(
         ),
         delivery_summary={"sent": sent, "failed": failed},
     )
+
+
+@router.get(
+    "/{course_id}/announcements",
+    response_model=AnnouncementListResponse,
+)
+async def list_announcements(
+    course_id: str,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> AnnouncementListResponse:
+    await _require_course(db, course_id)
+
+    result = await db.execute(
+        select(Announcement)
+        .where(Announcement.course_id == course_id)
+        .order_by(Announcement.sent_at.desc())
+    )
+    rows = list(result.scalars().all())
+
+    title_map = await _enrich_target_titles(db, course_id, rows)
+
+    # Creator names auflösen
+    creator_ids = {a.created_by_user_id for a in rows if a.created_by_user_id}
+    creators: dict[str, User] = {}
+    if creator_ids:
+        result = await db.execute(select(User).where(User.id.in_(creator_ids)))
+        for u in result.scalars():
+            creators[u.id] = u
+
+    items = []
+    for a in rows:
+        target_title, module_title = title_map.get((a.target_type, a.target_id), (None, None))
+        creator = creators.get(a.created_by_user_id) if a.created_by_user_id else None
+        items.append(
+            AnnouncementResponse(
+                id=a.id,
+                course_id=a.course_id,
+                target_type=a.target_type,  # type: ignore
+                target_id=a.target_id,
+                target_title=target_title,
+                target_module_title=module_title,
+                subject=a.subject,
+                body=a.body,
+                recipient_count=a.recipient_count,
+                sent_at=a.sent_at,
+                created_by=CreatedByInfo(id=creator.id, name=creator.name or "") if creator else None,
+            )
+        )
+
+    return AnnouncementListResponse(announcements=items)
