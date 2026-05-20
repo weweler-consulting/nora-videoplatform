@@ -86,3 +86,43 @@ async def _enrolled_users(db: AsyncSession, course_id: str) -> list[User]:
         select(User).join(Enrollment, Enrollment.user_id == User.id).where(Enrollment.course_id == course_id)
     )
     return list(result.scalars().all())
+
+
+@router.get(
+    "/{course_id}/announcements/preview",
+    response_model=AnnouncementPreviewResponse,
+)
+async def preview_announcement(
+    course_id: str,
+    target_type: str,
+    target_id: str,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> AnnouncementPreviewResponse:
+    await _require_course(db, course_id)
+    target_title, module_title, _cta = await _resolve_target(db, course_id, target_type, target_id)
+
+    if target_type == "module":
+        suggested_subject = f"Neues Modul: {target_title}"
+        suggested_body = (
+            f"in deinem Kurs ist ein neues Modul verfügbar:\n\n"
+            f"{target_title}\n\n"
+            f"Schau gleich rein und mach weiter."
+        )
+    else:
+        suggested_subject = f"Neue Lektion in {module_title}: {target_title}"
+        suggested_body = (
+            f"in deinem Kurs ist eine neue Lektion verfügbar:\n\n"
+            f"{module_title} – {target_title}\n\n"
+            f"Schau gleich rein und mach weiter."
+        )
+
+    enrolled = await _enrolled_users(db, course_id)
+
+    return AnnouncementPreviewResponse(
+        suggested_subject=suggested_subject,
+        suggested_body=suggested_body,
+        recipient_count=len(enrolled),
+        target_title=target_title,
+        target_module_title=module_title,
+    )
