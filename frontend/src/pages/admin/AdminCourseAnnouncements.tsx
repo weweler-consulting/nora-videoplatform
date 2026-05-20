@@ -60,30 +60,30 @@ export default function AdminCourseAnnouncements() {
           {course.title}
         </Link>
         <span>/</span>
-        <span className="text-gray-700">Ankuendigungen</span>
+        <span className="text-gray-700">Ankündigungen</span>
       </div>
 
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <Megaphone size={20} className="text-[var(--nora-pink)]" />
-            Ankuendigungen
+            Ankündigungen
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            Informiere Klientinnen per E-Mail ueber neue Module oder Lektionen.
+            Informiere Klientinnen per E-Mail über neue Module oder Lektionen.
           </p>
         </div>
         <button
           onClick={() => setComposeOpen(true)}
           className="px-4 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors shrink-0"
         >
-          + Neue Ankuendigung
+          + Neue Ankündigung
         </button>
       </div>
 
       {items.length === 0 ? (
         <div className="bg-white rounded-2xl p-12 text-center text-gray-500">
-          Noch keine Ankuendigungen verschickt.
+          Noch keine Ankündigungen verschickt.
         </div>
       ) : (
         <div className="space-y-3">
@@ -97,13 +97,13 @@ export default function AdminCourseAnnouncements() {
               </div>
               <div className="text-sm text-gray-600 mb-2">
                 {a.target_type === 'module'
-                  ? `Modul: ${a.target_title ?? '(geloescht)'}`
-                  : `Lektion: ${a.target_module_title ?? '?'} - ${a.target_title ?? '(geloescht)'}`}
+                  ? `Modul: ${a.target_title ?? '(gelöscht)'}`
+                  : `Lektion: ${a.target_module_title ?? '?'} – ${a.target_title ?? '(gelöscht)'}`}
               </div>
               <div className="text-xs text-gray-500">
                 Versendet an {a.recipient_count}{' '}
                 {a.recipient_count === 1 ? 'Teilnehmerin' : 'Teilnehmerinnen'}
-                {a.created_by ? ` - von ${a.created_by.name}` : ''}
+                {a.created_by ? ` · von ${a.created_by.name}` : ''}
               </div>
             </div>
           ))}

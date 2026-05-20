@@ -127,7 +127,7 @@ export default function AnnouncementComposeModal({
             <Dialog.Description className="sr-only">
               Sende eine E-Mail an alle Teilnehmerinnen dieses Kurses.
             </Dialog.Description>
-            <Dialog.Close className="text-gray-400 hover:text-gray-600" aria-label="Schliessen">
+            <Dialog.Close className="text-gray-400 hover:text-gray-600" aria-label="Schließen">
               <X size={20} />
             </Dialog.Close>
           </div>
@@ -135,14 +135,14 @@ export default function AnnouncementComposeModal({
           <div className="p-5 space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1">
-                Worueber informieren?
+                Worüber informieren?
               </label>
               <select
                 value={targetKey}
                 onChange={(e) => setTargetKey(e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] focus:border-transparent"
               >
-                <option value="">- bitte waehlen -</option>
+                <option value="">— bitte wählen —</option>
                 {targets.map((t) => (
                   <option key={`${t.type}:${t.id}`} value={`${t.type}:${t.id}`}>
                     {t.label}
@@ -175,7 +175,7 @@ export default function AnnouncementComposeModal({
               />
               <p className="text-xs text-gray-500 mt-1">
                 Klientinnen werden automatisch mit &bdquo;Hallo [Name]&ldquo; angesprochen,
-                am Ende kommt die Grussformel. Du schreibst nur den Mittelteil.
+                am Ende kommt die Grußformel. Du schreibst nur den Mittelteil.
               </p>
             </div>
 

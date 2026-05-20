@@ -159,10 +159,10 @@ export default function AdminModuleDetail() {
           <button
             onClick={() => setAnnounceTarget({ type: 'module', id: module.id })}
             className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-[var(--nora-pink-dark)] transition-colors"
-            title="Klientinnen ueber dieses Modul informieren"
+            title="Klientinnen über dieses Modul informieren"
           >
             <Megaphone size={14} />
-            Ankuendigen
+            Ankündigen
           </button>
           <button
             onClick={() => { resetForm(); setShowCreate(true); }}
@@ -282,8 +282,8 @@ export default function AdminModuleDetail() {
                       <button
                         onClick={() => setAnnounceTarget({ type: 'lesson', id: lesson.id })}
                         className="p-1.5 text-gray-500 hover:text-[var(--nora-pink-dark)] border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        title="Klientinnen ueber diese Lektion informieren"
-                        aria-label="Lektion ankuendigen"
+                        title="Klientinnen über diese Lektion informieren"
+                        aria-label="Lektion ankündigen"
                       >
                         <Megaphone size={14} />
                       </button>

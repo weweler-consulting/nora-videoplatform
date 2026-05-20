@@ -113,10 +113,10 @@ export default function AdminCourseDetail() {
           <Link
             to={`/admin/course/${courseId}/announcements`}
             className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-[var(--nora-pink-dark)] transition-colors"
-            title="Ankuendigungen verwalten"
+            title="Ankündigungen verwalten"
           >
             <Megaphone size={14} />
-            Ankuendigungen
+            Ankündigungen
           </Link>
           <button
             onClick={() => setShowCreate(!showCreate)}
