@@ -44,7 +44,9 @@ export default function AdminCourseHub() {
   }, [courseId]);
 
   const hubIsEmpty =
-    hub.links.length === 0 && hub.live_calls.length === 0 && hub.products.length === 0;
+    hub.links.length === 0 && hub.live_calls.length === 0 &&
+    hub.products.length === 0 && hub.downloads.length === 0 &&
+    !hub.hero_title_html && !hub.hero_body && !hub.hero_eyebrow;
 
   const copyFromCourse = async () => {
     if (!courseId || !copySource) return;

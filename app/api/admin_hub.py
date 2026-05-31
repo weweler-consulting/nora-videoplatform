@@ -277,7 +277,14 @@ async def copy_hub_from(
     await _require_course(db, source_course_id)
 
     target = await _load_or_create_hub(db, course_id)
-    if target.links or target.live_calls or target.products:
+    # "Empty" also covers hero text and downloads, not just the lists — otherwise a
+    # hub where someone already typed hero copy or uploaded a PDF would be silently
+    # overwritten by the copy. (contact_role has a non-empty default, so it's excluded.)
+    hero_filled = bool(target.hero_title_html or target.hero_body or target.hero_eyebrow)
+    if (
+        target.links or target.live_calls or target.products
+        or target.downloads or hero_filled
+    ):
         raise HTTPException(status_code=409, detail="Ziel-Hub ist nicht leer")
 
     source = await _load_hub_readonly(db, source_course_id)

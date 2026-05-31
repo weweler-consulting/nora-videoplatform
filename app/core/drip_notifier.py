@@ -23,7 +23,13 @@ async def check_drip_notifications(base_url: str = "https://kurse.noraweweler.de
             select(Enrollment, User, Course)
             .join(User, User.id == Enrollment.user_id)
             .join(Course, Course.id == Enrollment.course_id)
-            .where(User.is_active == True, User.is_admin == False)
+            # Only notify accounts that can actually log in. Invited / Stripe-created
+            # users start with an empty password until they accept the invite; mailing
+            # them a "new module" link they can't use would burn the one-shot dedup.
+            .where(
+                User.is_active == True, User.is_admin == False,
+                User.hashed_password != "",
+            )
         )
         rows = result.all()
 
@@ -74,19 +80,27 @@ async def check_drip_notifications(base_url: str = "https://kurse.noraweweler.de
                 # Send notification
                 login_url = f"{base_url}/login"
                 try:
-                    send_module_unlocked_email(
+                    sent = send_module_unlocked_email(
                         to_email=user.email,
                         to_name=user.name,
                         module_title=module.title,
                         course_title=course.title,
                         login_url=login_url,
                     )
-                    logger.info(f"Drip notification sent to {user.email} for module '{module.title}'")
                 except Exception as e:
                     logger.error(f"Failed to send drip notification to {user.email}: {e}")
                     continue
 
-                # Record notification
+                # Only record the dedup row once the mail actually went out. The send
+                # helper returns False (without raising) when mail is not configured —
+                # writing the dedup row then would silently swallow the notification.
+                if not sent:
+                    logger.error(
+                        f"Drip notification to {user.email} not sent (mail not configured?); will retry"
+                    )
+                    continue
+
+                logger.info(f"Drip notification sent to {user.email} for module '{module.title}'")
                 db.add(DripNotification(user_id=user.id, module_id=module.id))
                 await db.commit()
 
