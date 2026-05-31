@@ -123,13 +123,89 @@ def _cta_button(href: str, label: str) -> str:
     )
 
 
+# Pflicht-Widerrufsbelehrung für die Kauf-Bestätigungsmail (Textform, § 312f BGB).
+# Volltext muss in der Mail stehen (ein bloßer Link ist kein dauerhafter Datenträger).
+# Inhaltlich identisch zur Seite /widerruf.
+_WIDERRUF_SELLER = "Weweler Consulting S.L., Avenida Colón 10A, 38109 Radazul, Spanien, E-Mail: nora@noraweweler.de, Telefon: +49 151 46529540"
+
+
+def _widerruf_text() -> str:
+    return (
+        "\n\n———\n"
+        "Widerrufsbelehrung\n\n"
+        "Widerrufsrecht\n"
+        "Sie haben das Recht, binnen vierzehn Tagen ohne Angabe von Gründen diesen Vertrag zu "
+        "widerrufen. Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des Vertragsabschlusses. "
+        f"Um Ihr Widerrufsrecht auszuüben, müssen Sie uns ({_WIDERRUF_SELLER}) mittels einer "
+        "eindeutigen Erklärung (z. B. Brief oder E-Mail) über Ihren Entschluss, diesen Vertrag zu "
+        "widerrufen, informieren. Zur Wahrung der Frist genügt die rechtzeitige Absendung.\n\n"
+        "Folgen des Widerrufs\n"
+        "Wenn Sie diesen Vertrag widerrufen, zahlen wir Ihnen alle erhaltenen Zahlungen unverzüglich und "
+        "spätestens binnen vierzehn Tagen ab Eingang Ihrer Widerrufsmitteilung zurück, über dasselbe "
+        "Zahlungsmittel wie bei der ursprünglichen Transaktion; Entgelte berechnen wir Ihnen dafür nicht. "
+        "Haben Sie verlangt, dass eine Dienstleistung (z. B. ein Live-Kurs) während der Widerrufsfrist "
+        "beginnt, schulden Sie uns einen angemessenen Betrag für die bis zum Widerruf bereits erbrachten "
+        "Leistungen.\n\n"
+        "Vorzeitiges Erlöschen\n"
+        "Bei digitalen Inhalten (z. B. dem Frühstücks-Code) erlischt Ihr Widerrufsrecht, wenn wir mit der "
+        "Ausführung begonnen haben, nachdem Sie ausdrücklich zugestimmt und bestätigt haben, dass Sie "
+        "dadurch Ihr Widerrufsrecht verlieren, und wir Ihnen dies bestätigt haben. Bei Dienstleistungen / "
+        "Live-Kursen erlischt es mit vollständiger Erbringung, wenn Sie dem vorzeitigen Beginn ausdrücklich "
+        "zugestimmt und Ihre Kenntnis des Rechtsverlusts bestätigt haben.\n\n"
+        "Muster-Widerrufsformular\n"
+        "(Wenn Sie den Vertrag widerrufen wollen, füllen Sie dieses Formular aus und senden es zurück.)\n"
+        f"An: {_WIDERRUF_SELLER}\n"
+        "Hiermit widerrufe(n) ich/wir (*) den von mir/uns (*) abgeschlossenen Vertrag über die folgende "
+        "Dienstleistung / die folgende Ware (*): __________\n"
+        "Bestellt am (*) / erhalten am (*): __________ · Name: __________ · Anschrift: __________ · "
+        "Datum: __________ · Unterschrift (nur auf Papier): __________\n"
+        "(*) Unzutreffendes streichen."
+    )
+
+
+def _widerruf_html() -> str:
+    p = 'style="margin:0 0 8px 0;"'
+    s = 'style="color:#888;"'
+    return (
+        '<hr style="border:none;border-top:1px solid #e3e3e3;margin:34px 0 14px 0;">'
+        '<div style="font-size:11px;line-height:1.55;color:#9a958e;">'
+        '<p style="margin:0 0 6px 0;font-weight:700;color:#888;letter-spacing:.5px;text-transform:uppercase;">Widerrufsbelehrung</p>'
+        f'<p {p}><strong {s}>Widerrufsrecht.</strong> Sie haben das Recht, binnen vierzehn Tagen ohne Angabe '
+        'von Gründen diesen Vertrag zu widerrufen. Die Widerrufsfrist beträgt vierzehn Tage ab dem Tag des '
+        f'Vertragsabschlusses. Um Ihr Widerrufsrecht auszuüben, müssen Sie uns ({_WIDERRUF_SELLER}) mittels '
+        'einer eindeutigen Erklärung (z. B. Brief oder E-Mail) informieren. Zur Wahrung der Frist genügt die '
+        'rechtzeitige Absendung.</p>'
+        f'<p {p}><strong {s}>Folgen des Widerrufs.</strong> Wir zahlen Ihnen alle erhaltenen Zahlungen '
+        'unverzüglich und spätestens binnen vierzehn Tagen ab Eingang Ihrer Widerrufsmitteilung zurück, '
+        'über dasselbe Zahlungsmittel; Entgelte berechnen wir dafür nicht. Haben Sie verlangt, dass eine '
+        'Dienstleistung (z. B. ein Live-Kurs) während der Widerrufsfrist beginnt, schulden Sie uns einen '
+        'angemessenen Betrag für die bis zum Widerruf erbrachten Leistungen.</p>'
+        f'<p {p}><strong {s}>Vorzeitiges Erlöschen.</strong> Bei digitalen Inhalten (z. B. dem '
+        'Frühstücks-Code) erlischt Ihr Widerrufsrecht, wenn wir mit der Ausführung begonnen haben, nachdem '
+        'Sie ausdrücklich zugestimmt und bestätigt haben, dass Sie dadurch Ihr Widerrufsrecht verlieren, und '
+        'wir Ihnen dies bestätigt haben. Bei Dienstleistungen / Live-Kursen erlischt es mit vollständiger '
+        'Erbringung, wenn Sie dem vorzeitigen Beginn ausdrücklich zugestimmt und Ihre Kenntnis des '
+        'Rechtsverlusts bestätigt haben.</p>'
+        f'<p style="margin:0;"><strong {s}>Muster-Widerrufsformular.</strong> (Bei Widerruf ausfüllen und '
+        f'zurücksenden.) An: {_WIDERRUF_SELLER} — Hiermit widerrufe(n) ich/wir (*) den abgeschlossenen '
+        'Vertrag über die folgende Dienstleistung / Ware (*): ____ · Bestellt/erhalten am (*): ____ · '
+        'Name: ____ · Anschrift: ____ · Datum: ____ · Unterschrift (nur auf Papier): ____ · '
+        '(*) Unzutreffendes streichen.</p>'
+        '</div>'
+    )
+
+
 def send_invite_email(
     to_email: str,
     to_name: str,
     course_title: str,
     invite_url: str,
+    with_widerruf: bool = False,
 ) -> bool:
-    """Send invite email with accept-invite link. Returns True if sent, False if SMTP not configured."""
+    """Send invite email with accept-invite link. Returns True if sent, False if SMTP not configured.
+
+    with_widerruf=True hängt die Pflicht-Widerrufsbelehrung an (nur bei echten
+    Käufen aus dem Stripe-Webhook, nicht bei manuellen CRM-Einladungen)."""
     config = get_smtp_config()
     if not config:
         return False
@@ -162,6 +238,10 @@ P.S. Deinen Kurs erreichst du jederzeit unter kurse.noraweweler.de - speichere d
 <p style="margin: 24px 0 16px 0; color: #aaa; font-size: 12px;">Falls du diese Einladung nicht erwartet hast, kannst du diese E-Mail ignorieren.</p>
 <p style="margin: 0 0 16px 0;">Liebe Gr&uuml;&szlig;e<br>Nora</p>
 <p style="margin: 24px 0 0 0; padding: 14px 18px; background-color: #fdf2f4; border-left: 3px solid #D47479; font-size: 13px; color: #555; line-height: 1.65;"><strong style="color: #303030;">P.S.</strong> Deinen Kurs erreichst du jederzeit unter <a href="https://kurse.noraweweler.de" style="color: #D47479; font-weight: 700; text-decoration: none;">kurse.noraweweler.de</a> &mdash; speichere dir die Adresse gleich als Lesezeichen.</p>"""
+
+    if with_widerruf:
+        text += _widerruf_text()
+        body_html += _widerruf_html()
 
     html = _wrap_in_brand_template(body_html)
 
@@ -197,8 +277,11 @@ def send_course_added_email(
     to_name: str,
     course_title: str,
     login_url: str,
+    with_widerruf: bool = False,
 ) -> bool:
-    """Notify an existing, activated user that a new course has been added to their account."""
+    """Notify an existing, activated user that a new course has been added to their account.
+
+    with_widerruf=True hängt die Pflicht-Widerrufsbelehrung an (Käufe via Stripe-Webhook)."""
     config = get_smtp_config()
     if not config:
         return False
@@ -221,6 +304,10 @@ Nora"""
 {_cta_button(login_url, "Jetzt einloggen")}
 <p style="margin: 0 0 16px 0; color: #888; font-size: 13px;">Falls der Button nicht funktioniert: <a href="{login_url}" style="color: #D47479;">{login_url}</a></p>
 <p style="margin: 24px 0 0 0;">Liebe Gr&uuml;&szlig;e<br>Nora</p>"""
+
+    if with_widerruf:
+        text += _widerruf_text()
+        body_html += _widerruf_html()
 
     html = _wrap_in_brand_template(body_html)
 
