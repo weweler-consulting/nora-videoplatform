@@ -106,6 +106,12 @@ export const hubApi = {
       body: JSON.stringify(payload),
     }),
 
+  copyFrom: (courseId: string, sourceCourseId: string) =>
+    jsonRequest<HubPayload>(
+      `/admin/courses/${courseId}/hub/copy-from/${sourceCourseId}`,
+      { method: 'POST' },
+    ),
+
   uploadPdf: async (courseId: string, file: File) => {
     const form = new FormData();
     form.append('file', file);

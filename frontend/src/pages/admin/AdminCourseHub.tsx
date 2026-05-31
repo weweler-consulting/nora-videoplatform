@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { hubApi } from '../../lib/api/hub';
+import { api, type CourseListItem } from '../../lib/api';
 import type {
   HubPayload, HeroVariant,
   HubLink as HubLinkType, HubLiveCall as LiveCallType,
@@ -26,11 +27,40 @@ export default function AdminCourseHub() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [otherCourses, setOtherCourses] = useState<CourseListItem[]>([]);
+  const [copySource, setCopySource] = useState('');
+  const [copying, setCopying] = useState(false);
 
   useEffect(() => {
     if (!courseId) return;
     hubApi.getAdmin(courseId).then(setHub).catch((e) => setError(e.message)).finally(() => setLoading(false));
   }, [courseId]);
+
+  useEffect(() => {
+    if (!courseId) return;
+    api.getAllCourses()
+      .then((cs) => setOtherCourses(cs.filter((c) => c.id !== courseId)))
+      .catch(() => { /* Vorlagen-Auswahl ist optional; Fehler hier ignorieren */ });
+  }, [courseId]);
+
+  const hubIsEmpty =
+    hub.links.length === 0 && hub.live_calls.length === 0 && hub.products.length === 0;
+
+  const copyFromCourse = async () => {
+    if (!courseId || !copySource) return;
+    if (!confirm('Hub aus dem gewählten Kurs übernehmen? Der aktuelle (leere) Hub wird damit befüllt.')) return;
+    setCopying(true);
+    setError(null);
+    try {
+      const copied = await hubApi.copyFrom(courseId, copySource);
+      setHub(copied);
+      setCopySource('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Übernahme fehlgeschlagen');
+    } finally {
+      setCopying(false);
+    }
+  };
 
   const save = async () => {
     if (!courseId) return;
@@ -66,6 +96,39 @@ export default function AdminCourseHub() {
         padding: 12, background: '#fde7e7', color: '#8b0000',
         borderRadius: 8, marginBottom: 16,
       }}>{error}</div>}
+
+      {hubIsEmpty && otherCourses.length > 0 && (
+        <FormSection title="Aus anderem Kurs übernehmen">
+          <p style={{ fontSize: 13, color: 'rgba(48,48,48,0.7)', marginBottom: 12 }}>
+            Übernimmt Hero-Texte, Kontakt, Links, Live-Calls und Produkt-Texte aus einem
+            bestehenden Kurs. Bilder &amp; PDF-Downloads werden nicht kopiert – bitte unten
+            neu hochladen. Nur möglich, solange dieser Hub noch leer ist.
+          </p>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <select
+              value={copySource}
+              onChange={(e) => setCopySource(e.target.value)}
+              disabled={copying}
+              style={{ ...inputBase, marginBottom: 0, width: 'auto', flex: '1 1 240px' }}
+            >
+              <option value="">Quellkurs wählen …</option>
+              {otherCourses.map((c) => (
+                <option key={c.id} value={c.id}>{c.title}</option>
+              ))}
+            </select>
+            <button
+              onClick={copyFromCourse}
+              disabled={copying || !copySource}
+              style={{
+                padding: '10px 24px', borderRadius: 'var(--radius-pill)',
+                background: 'var(--berry)', color: '#fff', border: 'none',
+                cursor: copying || !copySource ? 'default' : 'pointer',
+                fontWeight: 700, opacity: copying || !copySource ? 0.5 : 1,
+              }}
+            >{copying ? 'Übernimmt …' : 'Übernehmen'}</button>
+          </div>
+        </FormSection>
+      )}
 
       <HeroSection hub={hub} setHub={setHub} />
 
