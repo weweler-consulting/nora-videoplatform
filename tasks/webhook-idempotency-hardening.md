@@ -1,6 +1,10 @@
 # Hardening: Stripe-Webhook Idempotenz — stiller Zahlungsverlust (F1)
 
-Aufgeschrieben: 2026-05-31 · Priorität: hoch (Geld-Pfad, Live-Betrieb) · noch offen
+Aufgeschrieben: 2026-05-31 · Priorität: hoch (Geld-Pfad, Live-Betrieb)
+**GELÖST: 2026-05-31 via Option A** — Claim + Enrollment in einer Transaktion
+(siehe app/api/stripe_webhook.py, tests/test_stripe_webhook.py). Optionales
+Sicherheitsnetz C (täglicher Abgleich Stripe↔Enrollments) bleibt offen als
+separates Monitoring-Thema.
 
 ## Problem
 
