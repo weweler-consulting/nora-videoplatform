@@ -117,25 +117,43 @@ async def stripe_webhook(request: Request):
         logger.info(f"Unhandled Stripe event type: {event['type']} — not claiming")
         return {"ok": True, "ignored": "unhandled_type"}
 
-    # Idempotency: claim the event ID. Skip if already processed.
+    # Idempotency + work in ONE transaction (F1 hardening): the event counts as
+    # processed only once the enrollment changes are durably committed. The claim
+    # is flushed (not committed) to detect duplicates via the unique PK, then the
+    # handler writes in the SAME transaction, and a single commit makes both durable.
+    # If the handler raises, the whole transaction — including the claim — rolls
+    # back, so Stripe's retry reprocesses instead of hitting a phantom "already
+    # processed" with no access granted.
+    email_job = None
     async with async_session() as db:
         db.add(StripeProcessedEvent(event_id=event["id"]))
         try:
-            await db.commit()
+            await db.flush()
         except IntegrityError:
+            await db.rollback()
             logger.info(f"Stripe event {event['id']} already processed, skipping")
             return {"ok": True, "duplicate": True}
 
-    if event["type"] == "checkout.session.completed":
-        await _handle_checkout_completed(event["data"]["object"], request)
-    elif event["type"] == "charge.refunded":
-        await _handle_refund(event["data"]["object"])
+        if event["type"] == "checkout.session.completed":
+            email_job = await _handle_checkout_completed(event["data"]["object"], request, db)
+        elif event["type"] == "charge.refunded":
+            await _handle_refund(event["data"]["object"], db)
+
+        await db.commit()
+
+    # Emails only AFTER the claim + enrollment are durably committed, so a mail
+    # failure can neither roll back access nor leave the event unclaimed.
+    if email_job is not None:
+        email_job()
 
     return {"ok": True}
 
 
-async def _handle_refund(charge: dict):
-    """Remove enrollments when a charge is fully refunded."""
+async def _handle_refund(charge: dict, db: AsyncSession):
+    """Remove enrollments when a charge is fully refunded.
+
+    Does NOT commit — the caller commits this together with the idempotency claim
+    in one transaction (F1 hardening)."""
     if charge.get("amount_refunded", 0) < charge.get("amount", 0):
         logger.info(f"Partial refund on charge {charge.get('id')}, ignoring")
         return
@@ -174,48 +192,53 @@ async def _handle_refund(charge: dict):
         logger.warning(f"Refund on {payment_intent_id}: no product IDs found")
         return
 
-    async with async_session() as db:
-        courses = await _courses_for_products(db, product_ids)
-        if not courses:
-            logger.info(f"Refund on {payment_intent_id}: no matching courses for products {product_ids}")
-            return
+    courses = await _courses_for_products(db, product_ids)
+    if not courses:
+        logger.info(f"Refund on {payment_intent_id}: no matching courses for products {product_ids}")
+        return
 
-        user_result = await db.execute(select(User).where(User.email == customer_email))
-        user = user_result.scalar_one_or_none()
-        if not user:
-            logger.info(f"Refund on {payment_intent_id}: no user for email {customer_email}")
-            return
+    user_result = await db.execute(select(User).where(User.email == customer_email))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        logger.info(f"Refund on {payment_intent_id}: no user for email {customer_email}")
+        return
 
-        removed_titles = []
-        for course in courses:
-            enrollment_result = await db.execute(
-                select(Enrollment).where(
-                    Enrollment.user_id == user.id,
-                    Enrollment.course_id == course.id,
-                )
+    removed_titles = []
+    for course in courses:
+        enrollment_result = await db.execute(
+            select(Enrollment).where(
+                Enrollment.user_id == user.id,
+                Enrollment.course_id == course.id,
             )
-            enrollment = enrollment_result.scalar_one_or_none()
-            if enrollment:
-                await db.delete(enrollment)
-                removed_titles.append(course.title)
-        await db.commit()
+        )
+        enrollment = enrollment_result.scalar_one_or_none()
+        if enrollment:
+            await db.delete(enrollment)
+            removed_titles.append(course.title)
 
-        if removed_titles:
-            logger.info(
-                f"Refund processed: removed enrollments for {customer_email} "
-                f"from courses {removed_titles}"
-            )
-        else:
-            logger.info(f"Refund on {payment_intent_id}: no enrollments to remove for {customer_email}")
+    if removed_titles:
+        logger.info(
+            f"Refund processed: removed enrollments for {customer_email} "
+            f"from courses {removed_titles}"
+        )
+    else:
+        logger.info(f"Refund on {payment_intent_id}: no enrollments to remove for {customer_email}")
 
 
-async def _handle_checkout_completed(session: dict, request: Request):
+async def _handle_checkout_completed(session: dict, request: Request, db: AsyncSession):
+    """Create user + enrollments for a completed checkout.
+
+    Does NOT commit — the caller commits these writes together with the
+    idempotency claim in one transaction (F1 hardening). Returns a zero-arg
+    callable that sends the appropriate email, to be invoked by the caller AFTER
+    the commit (so a mail failure cannot roll back access), or None if there is
+    nothing to send."""
     customer_email = session.get("customer_details", {}).get("email")
     customer_name = session.get("customer_details", {}).get("name", "")
 
     if not customer_email:
         logger.error("Stripe checkout session has no customer email")
-        return
+        return None
 
     # Get line items to find the product
     stripe.api_key = STRIPE_SECRET_KEY
@@ -230,69 +253,78 @@ async def _handle_checkout_completed(session: dict, request: Request):
 
     if not product_ids:
         logger.error(f"No products found in checkout session {session['id']}")
-        return
+        return None
 
-    async with async_session() as db:
-        # Find courses matching the product IDs (direct field + bundle mappings)
-        courses = await _courses_for_products(db, product_ids)
+    # Find courses matching the product IDs (direct field + bundle mappings)
+    courses = await _courses_for_products(db, product_ids)
 
-        if not courses:
-            logger.error(f"No courses found for Stripe product IDs: {product_ids}")
-            return
+    if not courses:
+        logger.error(f"No courses found for Stripe product IDs: {product_ids}")
+        return None
 
-        # Find or create user
-        user_result = await db.execute(select(User).where(User.email == customer_email))
-        user = user_result.scalar_one_or_none()
+    # Find or create user
+    user_result = await db.execute(select(User).where(User.email == customer_email))
+    user = user_result.scalar_one_or_none()
 
-        needs_invite = False
-        if not user:
-            name = customer_name or customer_email.split("@")[0]
-            user = User(
-                email=customer_email,
-                name=name,
-                hashed_password="",
-                invite_token=secrets.token_urlsafe(32),
-                invite_token_expires=utc_now() + timedelta(days=INVITE_TOKEN_TTL_DAYS),
+    needs_invite = False
+    if not user:
+        name = customer_name or customer_email.split("@")[0]
+        user = User(
+            email=customer_email,
+            name=name,
+            hashed_password="",
+            invite_token=secrets.token_urlsafe(32),
+            invite_token_expires=utc_now() + timedelta(days=INVITE_TOKEN_TTL_DAYS),
+        )
+        db.add(user)
+        await db.flush()
+        needs_invite = True
+    elif not user.invite_accepted_at:
+        # User stuck with an unaccepted invite — refresh token, resend
+        user.invite_token = secrets.token_urlsafe(32)
+        user.invite_token_expires = utc_now() + timedelta(days=INVITE_TOKEN_TTL_DAYS)
+        needs_invite = True
+
+    # Enroll in each matched course
+    enrolled_courses = []
+    for course in courses:
+        existing = await db.execute(
+            select(Enrollment).where(
+                Enrollment.user_id == user.id,
+                Enrollment.course_id == course.id,
             )
-            db.add(user)
-            await db.flush()
-            needs_invite = True
-        elif not user.invite_accepted_at:
-            # User stuck with an unaccepted invite — refresh token, resend
-            user.invite_token = secrets.token_urlsafe(32)
-            user.invite_token_expires = utc_now() + timedelta(days=INVITE_TOKEN_TTL_DAYS)
-            needs_invite = True
+        )
+        if not existing.scalar_one_or_none():
+            db.add(Enrollment(user_id=user.id, course_id=course.id))
+            enrolled_courses.append(course)
 
-        # Enroll in each matched course
-        enrolled_courses = []
-        for course in courses:
-            existing = await db.execute(
-                select(Enrollment).where(
-                    Enrollment.user_id == user.id,
-                    Enrollment.course_id == course.id,
-                )
-            )
-            if not existing.scalar_one_or_none():
-                db.add(Enrollment(user_id=user.id, course_id=course.id))
-                enrolled_courses.append(course)
+    if not enrolled_courses:
+        return None
 
-        await db.commit()
+    # Build the email closure now (while we have the data); the caller fires it
+    # after the commit. Capture plain strings so it holds no DB/session state.
+    base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
+    access_label = _access_label_for(enrolled_courses, product_ids)
+    recipient_name = user.name
+    invite_token = user.invite_token
 
-        if needs_invite and enrolled_courses:
-            base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
-            invite_url = f"{base}/accept-invite?token={user.invite_token}"
-            access_label = _access_label_for(enrolled_courses, product_ids)
+    if needs_invite:
+        invite_url = f"{base}/accept-invite?token={invite_token}"
+
+        def _send_email():
             try:
-                send_invite_email(customer_email, user.name, access_label, invite_url)
+                send_invite_email(customer_email, recipient_name, access_label, invite_url)
                 logger.info(f"Invite email sent to {customer_email} for: {access_label}")
             except Exception as e:
                 logger.error(f"Failed to send invite email to {customer_email}: {e}")
-        elif not needs_invite and enrolled_courses:
-            base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
-            login_url = f"{base}/login"
-            access_label = _access_label_for(enrolled_courses, product_ids)
+    else:
+        login_url = f"{base}/login"
+
+        def _send_email():
             try:
-                send_course_added_email(customer_email, user.name, access_label, login_url)
+                send_course_added_email(customer_email, recipient_name, access_label, login_url)
                 logger.info(f"Course-added email sent to {customer_email} for: {access_label}")
             except Exception as e:
                 logger.error(f"Failed to send course-added email to {customer_email}: {e}")
+
+    return _send_email

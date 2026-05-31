@@ -108,7 +108,13 @@ async def test_checkout_handler_enrolls_both_courses_and_sends_one_invite(engine
         "customer_details": {"email": "kundin@example.com", "name": "Test Kundin"},
     }
 
-    await wh._handle_checkout_completed(checkout, fake_request)
+    # New contract (F1): handler writes into the passed session without committing
+    # and returns an email thunk; the caller commits, then fires the email.
+    async with db_module.async_session() as db:
+        email_job = await wh._handle_checkout_completed(checkout, fake_request, db)
+        await db.commit()
+    assert email_job is not None
+    email_job()
 
     # User created
     user = (await session.execute(select(User).where(User.email == "kundin@example.com"))).scalar_one()
