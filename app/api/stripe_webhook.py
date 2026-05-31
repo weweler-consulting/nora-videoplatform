@@ -313,7 +313,7 @@ async def _handle_checkout_completed(session: dict, request: Request, db: AsyncS
 
         def _send_email():
             try:
-                send_invite_email(customer_email, recipient_name, access_label, invite_url)
+                send_invite_email(customer_email, recipient_name, access_label, invite_url, with_widerruf=True)
                 logger.info(f"Invite email sent to {customer_email} for: {access_label}")
             except Exception as e:
                 logger.error(f"Failed to send invite email to {customer_email}: {e}")
@@ -322,7 +322,7 @@ async def _handle_checkout_completed(session: dict, request: Request, db: AsyncS
 
         def _send_email():
             try:
-                send_course_added_email(customer_email, recipient_name, access_label, login_url)
+                send_course_added_email(customer_email, recipient_name, access_label, login_url, with_widerruf=True)
                 logger.info(f"Course-added email sent to {customer_email} for: {access_label}")
             except Exception as e:
                 logger.error(f"Failed to send course-added email to {customer_email}: {e}")
