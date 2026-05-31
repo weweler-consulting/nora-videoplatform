@@ -8,6 +8,7 @@ export default function AdminCourses() {
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
+  const [hubSourceId, setHubSourceId] = useState('');
 
   const load = () => {
     api.getAllCourses().then(setCourses).finally(() => setLoading(false));
@@ -18,9 +19,13 @@ export default function AdminCourses() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
-    await api.createCourse({ title: newTitle, description: newDesc || undefined });
+    const { id } = await api.createCourse({ title: newTitle, description: newDesc || undefined });
+    if (hubSourceId) {
+      await api.copyHubFrom(id, hubSourceId);
+    }
     setNewTitle('');
     setNewDesc('');
+    setHubSourceId('');
     setShowCreate(false);
     load();
   };
@@ -73,6 +78,25 @@ export default function AdminCourses() {
               rows={2}
               placeholder="Worum geht es in dem Kurs?"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Hub übernehmen von (optional)
+            </label>
+            <select
+              value={hubSourceId}
+              onChange={(e) => setHubSourceId(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] focus:border-transparent"
+            >
+              <option value="">Leer starten</option>
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>{c.title}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              Übernimmt Hero-Texte, Kontakt, Links, Live-Calls und Produkt-Texte.
+              Bilder &amp; PDF-Downloads bitte im neuen Hub neu hochladen.
+            </p>
           </div>
           <div className="flex gap-3">
             <button

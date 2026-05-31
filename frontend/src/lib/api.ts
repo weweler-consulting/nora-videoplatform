@@ -131,6 +131,10 @@ export const api = {
     request<{ id: string }>(`/courses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteCourse: (id: string) =>
     request(`/courses/${id}`, { method: 'DELETE' }),
+  copyHubFrom: (courseId: string, sourceCourseId: string) =>
+    request<unknown>(`/admin/courses/${courseId}/hub/copy-from/${sourceCourseId}`, {
+      method: 'POST',
+    }),
 
   createModule: (data: { course_id: string; title: string; sort_order?: number }) =>
     request<{ id: string }>('/modules/', { method: 'POST', body: JSON.stringify(data) }),
