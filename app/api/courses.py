@@ -10,6 +10,7 @@ from app.core.auth import get_current_user, require_admin, require_admin_or_serv
 from app.core.time import utc_now
 from app.models.user import User
 from app.models.course import Course, Module, Section, Lesson, Enrollment, LessonProgress, ModuleUnlock
+from app.models.hub import CourseHub
 from app.schemas.course import (
     CourseCreate, CourseUpdate, CourseOut, CourseListItem, ModuleOut, SectionOut, LessonOut,
 )
@@ -158,6 +159,10 @@ async def get_course(course_id: str, user: User = Depends(get_current_user), db:
 async def create_course(data: CourseCreate, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     course = Course(**data.model_dump())
     db.add(course)
+    await db.flush()
+    # Every course gets a hub from the start so the member area and its
+    # editor are immediately available (no lazy 404 "Hub not found").
+    db.add(CourseHub(course_id=course.id))
     await db.flush()
     return {"id": course.id}
 

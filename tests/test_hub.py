@@ -411,3 +411,23 @@ async def test_admin_put_hub_autocreates_when_missing(client, session):
     )
     assert r.status_code == 200
     assert r.json()["hero_variant"] == "dark"
+
+
+@pytest.mark.asyncio
+async def test_create_course_provisions_hub(client, session):
+    # A freshly created course must already have a hub, so the member area
+    # works even before the admin ever opens the editor.
+    admin = await _mk_user(session, admin=True)
+    token = create_access_token(admin.id)
+    r = await client.post(
+        "/api/v1/courses/",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"title": "Neuer Kurs"},
+    )
+    assert r.status_code == 200
+    course_id = r.json()["id"]
+
+    result = await session.execute(
+        CourseHub.__table__.select().where(CourseHub.course_id == course_id)
+    )
+    assert result.first() is not None
