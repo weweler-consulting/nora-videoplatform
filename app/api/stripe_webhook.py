@@ -45,6 +45,25 @@ async def _courses_for_products(db: AsyncSession, product_ids: list[str]) -> lis
     return list(result.scalars().all())
 
 
+def _join_de(titles: list[str]) -> str:
+    """Natural German enumeration: ['A','B'] -> 'A und B', ['A','B','C'] -> 'A, B und C'."""
+    if len(titles) <= 1:
+        return titles[0] if titles else ""
+    return f"{', '.join(titles[:-1])} und {titles[-1]}"
+
+
+def _access_label_for(courses: list[Course], product_ids: list[str]) -> str:
+    """Email-friendly access label. A course whose OWN Stripe product was bought
+    is the headline; courses that only come along via a bundle mapping read as
+    'inkl. …'. So the 4-Wochen purchase becomes
+    '4-Wochen Glukose Balance Code inkl. Frühstücks-Code'."""
+    primary = [c.title for c in courses if c.stripe_product_id in product_ids]
+    included = [c.title for c in courses if c.stripe_product_id not in product_ids]
+    if primary and included:
+        return f"{_join_de(primary)} inkl. {_join_de(included)}"
+    return _join_de(primary or included)
+
+
 class StripeProcessedEvent(Base):
     __tablename__ = "stripe_processed_events"
 
@@ -262,18 +281,18 @@ async def _handle_checkout_completed(session: dict, request: Request):
         if needs_invite and enrolled_courses:
             base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
             invite_url = f"{base}/accept-invite?token={user.invite_token}"
-            course_titles = ", ".join(c.title for c in enrolled_courses)
+            access_label = _access_label_for(enrolled_courses, product_ids)
             try:
-                send_invite_email(customer_email, user.name, course_titles, invite_url)
-                logger.info(f"Invite email sent to {customer_email} for courses: {course_titles}")
+                send_invite_email(customer_email, user.name, access_label, invite_url)
+                logger.info(f"Invite email sent to {customer_email} for: {access_label}")
             except Exception as e:
                 logger.error(f"Failed to send invite email to {customer_email}: {e}")
         elif not needs_invite and enrolled_courses:
             base = str(request.base_url).rstrip("/").replace("http://", "https://", 1)
             login_url = f"{base}/login"
-            course_titles = ", ".join(c.title for c in enrolled_courses)
+            access_label = _access_label_for(enrolled_courses, product_ids)
             try:
-                send_course_added_email(customer_email, user.name, course_titles, login_url)
-                logger.info(f"Course-added email sent to {customer_email} for: {course_titles}")
+                send_course_added_email(customer_email, user.name, access_label, login_url)
+                logger.info(f"Course-added email sent to {customer_email} for: {access_label}")
             except Exception as e:
                 logger.error(f"Failed to send course-added email to {customer_email}: {e}")

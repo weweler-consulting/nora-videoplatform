@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core import db as db_module
-from app.api.stripe_webhook import _courses_for_products
+from app.api.stripe_webhook import _courses_for_products, _access_label_for, _join_de
 from app.models.course import Course, ProductCourseMap
 
 FRUEHSTUECK_PROD = "prod_UT6hAjm5oSM5Qs"
@@ -25,6 +25,29 @@ async def _seed(session):
     session.add(ProductCourseMap(stripe_product_id=VIERWOCHEN_PROD, course_id=fruehstueck.id))
     await session.commit()
     return fruehstueck, begleit
+
+
+def test_join_de():
+    assert _join_de(["A"]) == "A"
+    assert _join_de(["A", "B"]) == "A und B"
+    assert _join_de(["A", "B", "C"]) == "A, B und C"
+
+
+def test_access_label_bundle_reads_as_main_plus_included():
+    courses = [
+        Course(title="4-Wochen Glukose Balance Code", stripe_product_id=VIERWOCHEN_PROD),
+        Course(title="Frühstücks-Code", stripe_product_id=FRUEHSTUECK_PROD),
+    ]
+    # Purchased product is the 4-Wochen one; Frühstücks-Code rides along via mapping
+    label = _access_label_for(courses, [VIERWOCHEN_PROD])
+    assert label == "4-Wochen Glukose Balance Code inkl. Frühstücks-Code"
+    # Order of the input list must not change the framing
+    assert _access_label_for(list(reversed(courses)), [VIERWOCHEN_PROD]) == label
+
+
+def test_access_label_single_course_unchanged():
+    courses = [Course(title="Frühstücks-Code", stripe_product_id=FRUEHSTUECK_PROD)]
+    assert _access_label_for(courses, [FRUEHSTUECK_PROD]) == "Frühstücks-Code"
 
 
 @pytest.mark.asyncio
