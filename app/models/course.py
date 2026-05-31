@@ -85,6 +85,19 @@ class Enrollment(Base):
     course = relationship("Course", back_populates="enrollments")
 
 
+class ProductCourseMap(Base):
+    """Maps a Stripe product to a course it grants, on top of the direct
+    Course.stripe_product_id field. Enables one product (e.g. the 4-Wochen
+    bundle) to grant access to several courses (Begleitkurs + Frühstücks-Code)."""
+    __tablename__ = "product_course_map"
+    __table_args__ = (UniqueConstraint("stripe_product_id", "course_id", name="uq_product_course"),)
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    stripe_product_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    course_id: Mapped[str] = mapped_column(String, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class DripNotification(Base):
     __tablename__ = "drip_notifications"
     __table_args__ = (UniqueConstraint("user_id", "module_id", name="uq_drip_user_module"),)

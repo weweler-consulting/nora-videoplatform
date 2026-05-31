@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 import stripe
 from fastapi import APIRouter, HTTPException, Request
-from sqlalchemy import String, DateTime, select
+from sqlalchemy import String, DateTime, select, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
@@ -14,7 +14,7 @@ from app.core.db import Base, async_session
 from app.core.email import send_invite_email, send_course_added_email
 from app.core.time import utc_now
 from app.models.user import User
-from app.models.course import Course, Enrollment
+from app.models.course import Course, Enrollment, ProductCourseMap
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,25 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 
 INVITE_TOKEN_TTL_DAYS = 7
+
+
+async def _courses_for_products(db: AsyncSession, product_ids: list[str]) -> list[Course]:
+    """All courses granted by these Stripe products: the direct
+    Course.stripe_product_id field match plus any product_course_map bundle
+    rows. Deduplicated (a course matched by both ways appears once)."""
+    result = await db.execute(
+        select(Course).where(
+            or_(
+                Course.stripe_product_id.in_(product_ids),
+                Course.id.in_(
+                    select(ProductCourseMap.course_id).where(
+                        ProductCourseMap.stripe_product_id.in_(product_ids)
+                    )
+                ),
+            )
+        )
+    )
+    return list(result.scalars().all())
 
 
 class StripeProcessedEvent(Base):
@@ -69,10 +88,7 @@ async def stripe_webhook(request: Request):
             logger.error(f"No products in session {session['id']} — not claiming event")
             return {"ok": True, "ignored": "no_products"}
         async with async_session() as check_db:
-            result = await check_db.execute(
-                select(Course).where(Course.stripe_product_id.in_(product_ids))
-            )
-            if not result.scalars().first():
+            if not await _courses_for_products(check_db, product_ids):
                 logger.error(
                     f"No courses match Stripe product IDs {product_ids} — not claiming event "
                     f"(resend after fix possible)"
@@ -140,10 +156,7 @@ async def _handle_refund(charge: dict):
         return
 
     async with async_session() as db:
-        courses_result = await db.execute(
-            select(Course).where(Course.stripe_product_id.in_(product_ids))
-        )
-        courses = courses_result.scalars().all()
+        courses = await _courses_for_products(db, product_ids)
         if not courses:
             logger.info(f"Refund on {payment_intent_id}: no matching courses for products {product_ids}")
             return
@@ -201,11 +214,8 @@ async def _handle_checkout_completed(session: dict, request: Request):
         return
 
     async with async_session() as db:
-        # Find courses matching the product IDs
-        result = await db.execute(
-            select(Course).where(Course.stripe_product_id.in_(product_ids))
-        )
-        courses = result.scalars().all()
+        # Find courses matching the product IDs (direct field + bundle mappings)
+        courses = await _courses_for_products(db, product_ids)
 
         if not courses:
             logger.error(f"No courses found for Stripe product IDs: {product_ids}")
