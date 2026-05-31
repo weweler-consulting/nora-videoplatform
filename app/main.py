@@ -104,6 +104,33 @@ async def _backfill_course_hubs() -> None:
         logger.info(f"Hub backfill: {result.rowcount} hubs created")
 
 
+async def _seed_bundle_mappings() -> None:
+    """The 4-Wochen-Bundle (prod_UbweNqpMeE7azJ) grants the Frühstücks-Code
+    course on top of its own Begleitkurs. Expressed as a product_course_map row,
+    resolved by the stable Frühstücks-Code product id so no course UUID is
+    hardcoded. Idempotent — the NOT EXISTS guard makes re-runs a no-op."""
+    bundle_product = "prod_UbweNqpMeE7azJ"
+    fruehstueck_product = "prod_UT6hAjm5oSM5Qs"
+    async with engine.begin() as conn:
+        uuid_expr = (
+            "lower(hex(randomblob(16)))"
+            if engine.dialect.name == "sqlite"
+            else "gen_random_uuid()::text"
+        )
+        result = await conn.execute(
+            text(
+                f"INSERT INTO product_course_map (id, stripe_product_id, course_id, created_at) "
+                f"SELECT {uuid_expr}, :bundle, c.id, CURRENT_TIMESTAMP FROM courses c "
+                f"WHERE c.stripe_product_id = :fruehstueck "
+                f"AND NOT EXISTS (SELECT 1 FROM product_course_map m "
+                f"WHERE m.stripe_product_id = :bundle AND m.course_id = c.id)"
+            ),
+            {"bundle": bundle_product, "fruehstueck": fruehstueck_product},
+        )
+        if result.rowcount:
+            logger.info(f"Seeded 4-Wochen bundle mapping ({result.rowcount} row)")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
@@ -127,6 +154,11 @@ async def lifespan(app: FastAPI):
         await _backfill_course_hubs()
     except Exception as e:
         logger.warning(f"Hub backfill failed: {e}")
+    # Seed: 4-Wochen-Bundle additionally grants the Frühstücks-Code course
+    try:
+        await _seed_bundle_mappings()
+    except Exception as e:
+        logger.warning(f"Bundle mapping seed failed: {e}")
     task = asyncio.create_task(drip_notifier_loop())
     yield
     task.cancel()
