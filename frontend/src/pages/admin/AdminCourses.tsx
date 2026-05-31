@@ -9,6 +9,7 @@ export default function AdminCourses() {
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [hubSourceId, setHubSourceId] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = () => {
     api.getAllCourses().then(setCourses).finally(() => setLoading(false));
@@ -16,13 +17,36 @@ export default function AdminCourses() {
 
   useEffect(load, []);
 
+  const errMsg = (e: unknown) => (e instanceof Error ? e.message : 'Unbekannter Fehler');
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
-    const { id } = await api.createCourse({ title: newTitle, description: newDesc || undefined });
-    if (hubSourceId) {
-      await api.copyHubFrom(id, hubSourceId);
+    setActionError(null);
+
+    let createdId: string;
+    try {
+      const res = await api.createCourse({ title: newTitle, description: newDesc || undefined });
+      createdId = res.id;
+    } catch (err) {
+      setActionError(`Kurs konnte nicht angelegt werden: ${errMsg(err)}`);
+      return;
     }
+
+    // The course already exists at this point. If the hub copy fails, surface it
+    // clearly instead of swallowing it — otherwise it looks like nothing happened
+    // and the admin re-creates a duplicate.
+    if (hubSourceId) {
+      try {
+        await api.copyHubFrom(createdId, hubSourceId);
+      } catch (err) {
+        setActionError(
+          `Kurs „${newTitle}" wurde angelegt, aber die Hub-Übernahme ist fehlgeschlagen: ` +
+          `${errMsg(err)} Du kannst den Hub im Editor des Kurses übernehmen.`,
+        );
+      }
+    }
+
     setNewTitle('');
     setNewDesc('');
     setHubSourceId('');
@@ -55,6 +79,12 @@ export default function AdminCourses() {
           + Neuer Kurs
         </button>
       </div>
+
+      {actionError && (
+        <div className="mb-6 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+          {actionError}
+        </div>
+      )}
 
       {showCreate && (
         <form onSubmit={handleCreate} className="bg-white rounded-2xl p-6 mb-6 shadow-sm space-y-4">

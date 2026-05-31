@@ -102,6 +102,25 @@ async def test_copy_hub_rejects_non_empty_target(client, session):
 
 
 @pytest.mark.asyncio
+async def test_copy_hub_rejects_target_with_only_hero_text(client, session):
+    # Hero text already typed but no links/products yet must still block the copy,
+    # otherwise the hero copy would be silently overwritten.
+    admin = await _mk_user(session, admin=True)
+    source = await _mk_course(session, "Quelle")
+    await _mk_source_hub(session, source.id)
+    target = await _mk_course(session, "Ziel")
+    session.add(CourseHub(course_id=target.id, hero_title_html="Schon getippt"))
+    await session.commit()
+
+    token = create_access_token(admin.id)
+    r = await client.post(
+        f"/api/v1/admin/courses/{target.id}/hub/copy-from/{source.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_copy_hub_rejects_same_course(client, session):
     admin = await _mk_user(session, admin=True)
     course = await _mk_course(session, "Selbst")
