@@ -107,7 +107,7 @@ from pathlib import Path as _Path
 import bleach
 from sqlalchemy.orm import selectinload
 
-from app.api.hub import _hub_to_payload, _load_hub
+from app.api.hub import _hub_to_payload
 from app.integrations.bunny_storage import delete_image
 from app.models.hub import HubDownload, HubLink, HubLiveCall, HubProduct
 from app.schemas.hub import HubPayload
@@ -120,6 +120,30 @@ def _sanitize_html(raw: str) -> str:
     return bleach.clean(raw or "", tags=ALLOWED_HTML_TAGS, attributes={}, strip=True)
 
 
+async def _load_or_create_hub(db: AsyncSession, course_id: str) -> CourseHub:
+    """Return the course hub, creating an empty default if none exists yet.
+
+    Courses created via the admin UI do not get a hub row eagerly, so the
+    editor must lazily provision one instead of failing with 404.
+    """
+    result = await db.execute(
+        select(CourseHub).where(CourseHub.course_id == course_id).options(
+            selectinload(CourseHub.links),
+            selectinload(CourseHub.live_calls),
+            selectinload(CourseHub.products),
+            selectinload(CourseHub.downloads),
+        )
+    )
+    hub = result.scalar_one_or_none()
+    if hub:
+        return hub
+    hub = CourseHub(course_id=course_id)
+    db.add(hub)
+    await db.flush()
+    await db.refresh(hub, attribute_names=["links", "live_calls", "products", "downloads"])
+    return hub
+
+
 @router.get("/{course_id}/hub", response_model=HubPayload)
 async def admin_get_hub(
     course_id: str,
@@ -127,7 +151,7 @@ async def admin_get_hub(
     db: AsyncSession = Depends(get_db),
 ):
     await _require_course(db, course_id)
-    hub = await _load_hub(db, course_id)
+    hub = await _load_or_create_hub(db, course_id)
     return _hub_to_payload(hub)
 
 
@@ -139,7 +163,7 @@ async def admin_put_hub(
     db: AsyncSession = Depends(get_db),
 ):
     await _require_course(db, course_id)
-    hub = await _load_hub(db, course_id)
+    hub = await _load_or_create_hub(db, course_id)
 
     # Capture old media URLs/paths for cleanup
     old_pdf_paths = {d.file_path for d in hub.downloads}

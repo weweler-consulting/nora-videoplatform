@@ -367,3 +367,47 @@ async def test_admin_get_hub_returns_payload(client, session):
     )
     assert r.status_code == 200
     assert r.json()["hero_eyebrow"] == "From Admin"
+
+
+@pytest.mark.asyncio
+async def test_admin_get_hub_autocreates_when_missing(client, session):
+    # Newly created courses have no hub row yet; the editor must lazily
+    # provision one instead of returning 404 "Hub not found".
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    token = create_access_token(admin.id)
+    r = await client.get(
+        f"/api/v1/admin/courses/{course.id}/hub",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["hero_variant"] == "berry"
+    assert data["links"] == []
+
+    # The hub is persisted, so a follow-up read returns the same row.
+    result = await session.execute(
+        CourseHub.__table__.select().where(CourseHub.course_id == course.id)
+    )
+    assert result.first() is not None
+
+
+@pytest.mark.asyncio
+async def test_admin_put_hub_autocreates_when_missing(client, session):
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    token = create_access_token(admin.id)
+    r = await client.put(
+        f"/api/v1/admin/courses/{course.id}/hub",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "hero_variant": "dark", "hero_eyebrow": "E", "hero_title_html": "T",
+            "hero_body": "", "contact_user_id": None, "contact_name_override": "",
+            "contact_role": "", "contact_email_override": "", "contact_whatsapp_url": "",
+            "contact_photo_url": "", "show_contact": True, "show_live_calls": True,
+            "show_products": True, "show_downloads": True,
+            "links": [], "live_calls": [], "products": [], "downloads": [],
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["hero_variant"] == "dark"
