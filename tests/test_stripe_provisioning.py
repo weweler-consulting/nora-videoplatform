@@ -8,6 +8,7 @@ Frühstückscode purchase still grants only the one course.
 import pytest
 from sqlalchemy import select
 
+from app.core import db as db_module
 from app.api.stripe_webhook import _courses_for_products
 from app.models.course import Course, ProductCourseMap
 
@@ -55,6 +56,47 @@ async def test_unknown_product_grants_nothing(session):
     await _seed(session)
     courses = await _courses_for_products(session, ["prod_does_not_exist"])
     assert courses == []
+
+
+@pytest.mark.asyncio
+async def test_checkout_handler_enrolls_both_courses_and_sends_one_invite(engine, session, monkeypatch):
+    """End-to-end money path: a 4-Wochen purchase must create the user, enroll
+    them in BOTH courses, and send exactly ONE invite email naming both."""
+    import types
+    import app.api.stripe_webhook as wh
+    from app.models.user import User
+
+    fruehstueck, begleit = await _seed(session)
+
+    # Point the handler's session factory + Stripe + email at test doubles
+    monkeypatch.setattr(wh, "async_session", db_module.async_session)
+    monkeypatch.setattr(
+        wh.stripe.checkout.Session,
+        "list_line_items",
+        staticmethod(lambda sid, limit=10: {"data": [{"price": {"product": VIERWOCHEN_PROD}}]}),
+    )
+    sent = []
+    monkeypatch.setattr(wh, "send_invite_email", lambda *a, **k: sent.append(a) or True)
+    monkeypatch.setattr(wh, "send_course_added_email", lambda *a, **k: sent.append(("ADDED",) + a) or True)
+
+    fake_request = types.SimpleNamespace(base_url="https://kurse.noraweweler.de/")
+    checkout = {
+        "id": "cs_test_123",
+        "customer_details": {"email": "kundin@example.com", "name": "Test Kundin"},
+    }
+
+    await wh._handle_checkout_completed(checkout, fake_request)
+
+    # User created
+    user = (await session.execute(select(User).where(User.email == "kundin@example.com"))).scalar_one()
+    # Enrolled in BOTH courses
+    from app.models.course import Enrollment
+    enr = (await session.execute(select(Enrollment).where(Enrollment.user_id == user.id))).scalars().all()
+    assert {e.course_id for e in enr} == {fruehstueck.id, begleit.id}
+    # Exactly one invite email, naming both courses
+    assert len(sent) == 1
+    titles_arg = sent[0][2]
+    assert fruehstueck.title in titles_arg and begleit.title in titles_arg
 
 
 @pytest.mark.asyncio
