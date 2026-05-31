@@ -106,9 +106,10 @@ export const hubApi = {
       body: JSON.stringify(payload),
     }),
 
-  copyFrom: (courseId: string, sourceCourseId: string) =>
+  copyFrom: (courseId: string, sourceCourseId: string, overwrite = false) =>
     jsonRequest<HubPayload>(
-      `/admin/courses/${courseId}/hub/copy-from/${sourceCourseId}`,
+      `/admin/courses/${courseId}/hub/copy-from/${sourceCourseId}` +
+        (overwrite ? '?overwrite=true' : ''),
       { method: 'POST' },
     ),
 

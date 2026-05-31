@@ -50,11 +50,15 @@ export default function AdminCourseHub() {
 
   const copyFromCourse = async () => {
     if (!courseId || !copySource) return;
-    if (!confirm('Hub aus dem gewählten Kurs übernehmen? Der aktuelle (leere) Hub wird damit befüllt.')) return;
+    const message = hubIsEmpty
+      ? 'Hub aus dem gewählten Kurs übernehmen? Der aktuelle (leere) Hub wird damit befüllt.'
+      : 'Achtung: Der aktuelle Hub-Inhalt (Hero-Texte, Links, Live-Calls, Produkte, Downloads) '
+        + 'wird durch den gewählten Kurs ersetzt. Das Kontaktfoto bleibt erhalten. Fortfahren?';
+    if (!confirm(message)) return;
     setCopying(true);
     setError(null);
     try {
-      const copied = await hubApi.copyFrom(courseId, copySource);
+      const copied = await hubApi.copyFrom(courseId, copySource, !hubIsEmpty);
       setHub(copied);
       setCopySource('');
     } catch (e) {
@@ -99,12 +103,12 @@ export default function AdminCourseHub() {
         borderRadius: 8, marginBottom: 16,
       }}>{error}</div>}
 
-      {hubIsEmpty && otherCourses.length > 0 && (
+      {otherCourses.length > 0 && (
         <FormSection title="Aus anderem Kurs übernehmen">
           <p style={{ fontSize: 13, color: 'rgba(48,48,48,0.7)', marginBottom: 12 }}>
             Übernimmt Hero-Texte, Kontakt, Links, Live-Calls und Produkt-Texte aus einem
             bestehenden Kurs. Bilder &amp; PDF-Downloads werden nicht kopiert – bitte unten
-            neu hochladen. Nur möglich, solange dieser Hub noch leer ist.
+            neu hochladen.{!hubIsEmpty && ' Der aktuelle Hub-Inhalt wird dabei ersetzt (mit Rückfrage).'}
           </p>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <select

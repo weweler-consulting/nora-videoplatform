@@ -261,15 +261,22 @@ async def admin_put_hub(
 async def copy_hub_from(
     course_id: str,
     source_course_id: str,
+    overwrite: bool = False,
     _admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Copy a source course's hub (look + structure) into an EMPTY target hub.
+    """Copy a source course's hub (look + structure) into the target hub.
 
-    Owned binary assets are intentionally NOT copied (product images, contact
-    photo, PDF downloads): source and target would otherwise share one Bunny
-    URL, and editing the new hub later would delete the old course's asset.
-    Those are re-uploaded per round.
+    By default refuses a non-empty target with 409. With ?overwrite=true the
+    caller explicitly replaces the existing content (the editor asks for
+    confirmation first); the target's own binary assets (product images, PDF
+    downloads) are deleted to avoid orphans, the contact photo is kept (the copy
+    leaves it referenced).
+
+    Owned binary assets are NOT copied from the source (product images, contact
+    photo, PDF downloads): source and target would otherwise share one Bunny URL,
+    and editing one hub later would delete the other's asset. Those are uploaded
+    per course.
     """
     if course_id == source_course_id:
         raise HTTPException(status_code=400, detail="Quell- und Zielkurs sind identisch")
@@ -277,19 +284,36 @@ async def copy_hub_from(
     await _require_course(db, source_course_id)
 
     target = await _load_or_create_hub(db, course_id)
-    # "Empty" also covers hero text and downloads, not just the lists — otherwise a
-    # hub where someone already typed hero copy or uploaded a PDF would be silently
-    # overwritten by the copy. (contact_role has a non-empty default, so it's excluded.)
+    # "Non-empty" also covers hero text and downloads, not just the lists — so a hub
+    # where someone already typed hero copy or uploaded a PDF isn't silently
+    # overwritten. (contact_role has a non-empty default, so it's excluded.)
     hero_filled = bool(target.hero_title_html or target.hero_body or target.hero_eyebrow)
-    if (
+    target_non_empty = bool(
         target.links or target.live_calls or target.products
         or target.downloads or hero_filled
-    ):
+    )
+    if target_non_empty and not overwrite:
         raise HTTPException(status_code=409, detail="Ziel-Hub ist nicht leer")
 
     source = await _load_hub_readonly(db, source_course_id)
     if source is None:
         raise HTTPException(status_code=404, detail="Quellkurs hat keinen Hub")
+
+    # Overwrite: remember the target's OWN binary assets so we can delete them
+    # AFTER the DB write succeeds (same order as admin_put_hub), and clear the
+    # existing lists so the copy replaces rather than appends. These assets belong
+    # to this course (the copy never carries over source images), so deleting them
+    # is safe. The contact photo stays — the copy doesn't touch it.
+    stale_image_urls: list[str] = []
+    stale_file_paths: list[str] = []
+    if target_non_empty:
+        stale_image_urls = [p.image_url for p in target.products if p.image_url]
+        stale_file_paths = [d.file_path for d in target.downloads]
+        target.links.clear()
+        target.live_calls.clear()
+        target.products.clear()
+        target.downloads.clear()
+        await db.flush()
 
     # Hero
     target.hero_variant = source.hero_variant
@@ -327,4 +351,14 @@ async def copy_hub_from(
 
     await db.flush()
     await db.refresh(target, attribute_names=["links", "live_calls", "products", "downloads"])
+
+    # Dead-asset cleanup AFTER the new content is in place (mirrors admin_put_hub).
+    for url in stale_image_urls:
+        await delete_image(url)
+    for path in stale_file_paths:
+        try:
+            _Path(path).unlink(missing_ok=True)
+        except OSError:
+            pass
+
     return _hub_to_payload(target)

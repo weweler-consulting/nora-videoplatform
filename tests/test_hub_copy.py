@@ -121,6 +121,36 @@ async def test_copy_hub_rejects_target_with_only_hero_text(client, session):
 
 
 @pytest.mark.asyncio
+async def test_copy_hub_overwrite_replaces_existing_content(client, session):
+    # With ?overwrite=true a non-empty target is replaced by the source's content.
+    admin = await _mk_user(session, admin=True)
+    source = await _mk_course(session, "Quelle")
+    await _mk_source_hub(session, source.id)  # hero "Willkommen" + 1 link "WhatsApp" + ...
+    target = await _mk_course(session, "Ziel")
+    target_hub = CourseHub(course_id=target.id, hero_title_html="Alter Titel")
+    session.add(target_hub)
+    await session.flush()
+    session.add(HubLink(hub_id=target_hub.id, icon_type="book", label="Alter Link", sort_order=0))
+    session.add(HubDownload(
+        hub_id=target_hub.id, title="Altes PDF", file_path="/tmp/does-not-exist.pdf",
+        file_name="alt.pdf", file_size_kb=1,
+    ))
+    await session.commit()
+
+    token = create_access_token(admin.id)
+    r = await client.post(
+        f"/api/v1/admin/courses/{target.id}/hub/copy-from/{source.id}?overwrite=true",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    # Source content now in place, old content gone
+    assert data["hero_title_html"] == "Willkommen"
+    assert [l["label"] for l in data["links"]] == ["WhatsApp"]
+    assert data["downloads"] == []  # source has none; old download removed
+
+
+@pytest.mark.asyncio
 async def test_copy_hub_rejects_same_course(client, session):
     admin = await _mk_user(session, admin=True)
     course = await _mk_course(session, "Selbst")
