@@ -144,6 +144,19 @@ async def _load_or_create_hub(db: AsyncSession, course_id: str) -> CourseHub:
     return hub
 
 
+async def _load_hub_readonly(db: AsyncSession, course_id: str) -> CourseHub | None:
+    """Load a hub with all children for read-only copying. No side effects."""
+    result = await db.execute(
+        select(CourseHub).where(CourseHub.course_id == course_id).options(
+            selectinload(CourseHub.links),
+            selectinload(CourseHub.live_calls),
+            selectinload(CourseHub.products),
+            selectinload(CourseHub.downloads),
+        )
+    )
+    return result.scalar_one_or_none()
+
+
 @router.get("/{course_id}/hub", response_model=HubPayload)
 async def admin_get_hub(
     course_id: str,
@@ -242,3 +255,69 @@ async def admin_put_hub(
         await delete_image(old_contact_photo)
 
     return _hub_to_payload(hub)
+
+
+@router.post("/{course_id}/hub/copy-from/{source_course_id}", response_model=HubPayload)
+async def copy_hub_from(
+    course_id: str,
+    source_course_id: str,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Copy a source course's hub (look + structure) into an EMPTY target hub.
+
+    Owned binary assets are intentionally NOT copied (product images, contact
+    photo, PDF downloads): source and target would otherwise share one Bunny
+    URL, and editing the new hub later would delete the old course's asset.
+    Those are re-uploaded per round.
+    """
+    if course_id == source_course_id:
+        raise HTTPException(status_code=400, detail="Quell- und Zielkurs sind identisch")
+    await _require_course(db, course_id)
+    await _require_course(db, source_course_id)
+
+    target = await _load_or_create_hub(db, course_id)
+    if target.links or target.live_calls or target.products:
+        raise HTTPException(status_code=409, detail="Ziel-Hub ist nicht leer")
+
+    source = await _load_hub_readonly(db, source_course_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Quellkurs hat keinen Hub")
+
+    # Hero
+    target.hero_variant = source.hero_variant
+    target.hero_eyebrow = source.hero_eyebrow
+    target.hero_title_html = source.hero_title_html
+    target.hero_body = source.hero_body
+    # Contact (Textfelder; Foto bleibt leer — eigenes Asset)
+    target.contact_user_id = source.contact_user_id
+    target.contact_name_override = source.contact_name_override
+    target.contact_role = source.contact_role
+    target.contact_email_override = source.contact_email_override
+    target.contact_whatsapp_url = source.contact_whatsapp_url
+    # Visibility-Flags
+    target.show_contact = source.show_contact
+    target.show_live_calls = source.show_live_calls
+    target.show_products = source.show_products
+    target.show_downloads = source.show_downloads
+
+    for link in source.links:
+        target.links.append(HubLink(
+            icon_type=link.icon_type, label=link.label, sublabel=link.sublabel,
+            url=link.url, sort_order=link.sort_order,
+        ))
+    for call in source.live_calls:
+        target.live_calls.append(HubLiveCall(
+            tag=call.tag, title=call.title, body=call.body, sort_order=call.sort_order,
+        ))
+    for prod in source.products:
+        target.products.append(HubProduct(
+            label=prod.label, title=prod.title, description=prod.description,
+            cta_text=prod.cta_text, url=prod.url, image_url="",  # eigenes Asset
+            highlight=prod.highlight, sort_order=prod.sort_order,
+        ))
+    # downloads bewusst nicht kopiert
+
+    await db.flush()
+    await db.refresh(target, attribute_names=["links", "live_calls", "products", "downloads"])
+    return _hub_to_payload(target)
