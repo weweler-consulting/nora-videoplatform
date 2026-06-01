@@ -112,23 +112,46 @@ async def _seed_bundle_mappings() -> None:
     bundle_product = "prod_UbweNqpMeE7azJ"
     fruehstueck_product = "prod_UT6hAjm5oSM5Qs"
     async with engine.begin() as conn:
+        # Kurs über sein stabiles Produkt auflösen (keine hardcodierte UUID).
+        course_id = (
+            await conn.execute(
+                text("SELECT id FROM courses WHERE stripe_product_id = :fruehstueck"),
+                {"fruehstueck": fruehstueck_product},
+            )
+        ).scalar()
+        if course_id is None:
+            return
+
+        # Idempotenz-Guard als eigenes Statement: jeder Parameter taucht pro
+        # Statement nur EINMAL auf. Die frühere Single-Statement-Variante
+        # (INSERT … SELECT … NOT EXISTS) nutzte :bundle zweimal und ließ asyncpg
+        # auf Postgres widersprüchliche Typen ableiten (text vs varchar) →
+        # AmbiguousParameterError, der den Seed still scheitern ließ.
+        exists = (
+            await conn.execute(
+                text(
+                    "SELECT 1 FROM product_course_map "
+                    "WHERE stripe_product_id = :bundle AND course_id = :course_id"
+                ),
+                {"bundle": bundle_product, "course_id": course_id},
+            )
+        ).scalar()
+        if exists:
+            return
+
         uuid_expr = (
             "lower(hex(randomblob(16)))"
             if engine.dialect.name == "sqlite"
             else "gen_random_uuid()::text"
         )
-        result = await conn.execute(
+        await conn.execute(
             text(
                 f"INSERT INTO product_course_map (id, stripe_product_id, course_id, created_at) "
-                f"SELECT {uuid_expr}, :bundle, c.id, CURRENT_TIMESTAMP FROM courses c "
-                f"WHERE c.stripe_product_id = :fruehstueck "
-                f"AND NOT EXISTS (SELECT 1 FROM product_course_map m "
-                f"WHERE m.stripe_product_id = :bundle AND m.course_id = c.id)"
+                f"VALUES ({uuid_expr}, :bundle, :course_id, CURRENT_TIMESTAMP)"
             ),
-            {"bundle": bundle_product, "fruehstueck": fruehstueck_product},
+            {"bundle": bundle_product, "course_id": course_id},
         )
-        if result.rowcount:
-            logger.info(f"Seeded 4-Wochen bundle mapping ({result.rowcount} row)")
+        logger.info("Seeded 4-Wochen bundle mapping (1 row)")
 
 
 @asynccontextmanager
