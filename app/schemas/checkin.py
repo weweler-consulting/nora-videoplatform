@@ -53,3 +53,16 @@ class CheckinLessonUpdate(BaseModel):
     # key -> {frage?, optionen?}; instanz-eigene Overrides, lassen die stabilen
     # Template-Keys unangetastet → Wochen bleiben vergleichbar.
     step_overrides: Optional[dict[str, StepOverride]] = None
+
+
+class CheckinSubmit(BaseModel):
+    # key -> Wert (str | int | list[str]); freie JSON-Werte je Schritt-Typ
+    answers: dict[str, Any]
+
+
+class CheckinResponseOut(BaseModel):
+    submitted: bool
+    answers: dict[str, Any] = {}
+    submitted_at: Optional[str] = None
+    week_index: Optional[int] = None
+    template_typ: Optional[str] = None

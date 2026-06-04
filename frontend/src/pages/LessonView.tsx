@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import { api, type CourseDetail, type LessonItem, type AttachmentItem } from '../lib/api';
+import CheckinPlayer from './course/CheckinPlayer';
 
 // Normalise a Bunny Stream embed URL: force the iframe.mediadelivery.net host
 // and append params iOS Safari needs to play inline (otherwise the player
@@ -169,6 +170,28 @@ export default function LessonView() {
       {/* Lesson title */}
       <h2 className="text-lg md:text-xl font-semibold mb-4 md:mb-6">{currentLesson.title}</h2>
 
+      {currentLesson.type === 'checkin' ? (
+        <>
+          <CheckinPlayer
+            lessonId={currentLesson.id}
+            nextHref={nextLesson ? `/course/${courseId}/lesson/${nextLesson.id}` : null}
+            onCompleted={async () => {
+              if (courseId) setCourse(await api.getCourse(courseId));
+            }}
+          />
+          {prevLesson && (
+            <div className="flex">
+              <Link
+                to={`/course/${courseId}/lesson/${prevLesson.id}`}
+                className="px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Vorherige Lektion
+              </Link>
+            </div>
+          )}
+        </>
+      ) : (
+      <>
       {/* Video player — playsinline=true is required so iOS Safari plays the
           video inline instead of trying to enter native fullscreen, which fails
           inside the iframe and leaves the frame black. */}
@@ -270,6 +293,8 @@ export default function LessonView() {
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

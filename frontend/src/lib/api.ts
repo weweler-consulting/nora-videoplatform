@@ -242,6 +242,13 @@ export const api = {
     }),
   getCheckinLesson: (lessonId: string) =>
     request<CheckinLesson>(`/checkin/lessons/${lessonId}`),
+  getCheckinResponse: (lessonId: string) =>
+    request<CheckinResponseData>(`/checkin/lessons/${lessonId}/response`),
+  submitCheckin: (lessonId: string, answers: Record<string, unknown>) =>
+    request<{ ok: boolean; submitted_at: string }>(`/checkin/lessons/${lessonId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ answers }),
+    }),
   updateCheckinLesson: (lessonId: string, data: {
     title?: string;
     week_index?: number;
@@ -427,6 +434,14 @@ export interface CheckinLesson {
   template_name: string;
   week_index: number | null;
   steps: CheckinStep[];
+}
+
+export interface CheckinResponseData {
+  submitted: boolean;
+  answers: Record<string, string | number | string[]>;
+  submitted_at: string | null;
+  week_index: number | null;
+  template_typ: string | null;
 }
 
 export interface CourseDetail {

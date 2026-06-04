@@ -11,15 +11,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.core.auth import get_current_user, require_admin
+from app.core.time import utc_now
 from app.models.user import User
-from app.models.course import Course, Module, Section, Lesson
-from app.models.checkin import CheckinTemplate, CheckinStep
+from app.models.course import Course, Module, Section, Lesson, LessonProgress
+from app.models.checkin import CheckinTemplate, CheckinStep, CheckinResponse
+from app.api.progress import _require_enrollment_for_lesson
 from app.schemas.checkin import (
     CheckinTemplateOut, CheckinStepOut, CheckinLessonOut,
-    CheckinModuleCreate, CheckinLessonUpdate,
+    CheckinModuleCreate, CheckinLessonUpdate, CheckinSubmit, CheckinResponseOut,
 )
 
 router = APIRouter()
+
+# Schritt-Typen, die keine Antwort erwarten (reine Anzeige).
+_NON_ANSWER_TYPES = {"intro", "bestaetigung"}
 
 _DEFAULT_TITLE = {
     "start": "Check-in: Bestandsaufnahme",
@@ -184,3 +189,100 @@ async def update_checkin_lesson(
     lesson.checkin_overrides = overrides
 
     return {"id": lesson.id}
+
+
+def _answered(value) -> bool:
+    return value not in (None, "", [], {})
+
+
+@router.get("/lessons/{lesson_id}/response", response_model=CheckinResponseOut)
+async def get_checkin_response(
+    lesson_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    """Bestehende Antwort der Klientin (für Read-only/Bearbeiten beim Wiederöffnen)."""
+    await _require_enrollment_for_lesson(db, user, lesson_id)
+    resp = (await db.execute(
+        select(CheckinResponse).where(
+            CheckinResponse.user_id == user.id, CheckinResponse.lesson_id == lesson_id
+        )
+    )).scalar_one_or_none()
+    if not resp:
+        return CheckinResponseOut(submitted=False)
+    return CheckinResponseOut(
+        submitted=resp.status == "submitted",
+        answers=resp.answers or {},
+        submitted_at=resp.submitted_at.isoformat() if resp.submitted_at else None,
+        week_index=resp.week_index,
+        template_typ=resp.template_typ,
+    )
+
+
+@router.post("/lessons/{lesson_id}/submit", response_model=dict)
+async def submit_checkin(
+    lesson_id: str, data: CheckinSubmit,
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    """Antwort speichern (ZUERST in der video-platform → treibt Player & Fortschritt),
+    Lektion als abgeschlossen markieren. CRM-Sync folgt in Phase 4."""
+    await _require_enrollment_for_lesson(db, user, lesson_id)
+    lesson, section, module = await _load_checkin_lesson(db, lesson_id)
+    template = (await db.execute(
+        select(CheckinTemplate).where(CheckinTemplate.id == lesson.checkin_template_id)
+    )).scalar_one_or_none()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template nicht gefunden")
+    steps = (await db.execute(
+        select(CheckinStep).where(CheckinStep.template_id == template.id)
+    )).scalars().all()
+
+    # Pflichtfelder prüfen (intro/bestaetigung erwarten keine Antwort)
+    answers = data.answers or {}
+    missing = [
+        s.key for s in steps
+        if s.pflichtfeld and s.typ not in _NON_ANSWER_TYPES and not _answered(answers.get(s.key))
+    ]
+    if missing:
+        raise HTTPException(status_code=422, detail=f"Pflichtfelder fehlen: {', '.join(missing)}")
+
+    overrides = lesson.checkin_overrides or {}
+    week_index = overrides.get("week_index")
+
+    # Upsert auf (user, lesson). Bearbeiten setzt synced_to_crm zurück → re-sync.
+    resp = (await db.execute(
+        select(CheckinResponse).where(
+            CheckinResponse.user_id == user.id, CheckinResponse.lesson_id == lesson_id
+        )
+    )).scalar_one_or_none()
+    now = utc_now()
+    if resp:
+        resp.answers = answers
+        resp.status = "submitted"
+        resp.submitted_at = now
+        resp.week_index = week_index
+        resp.template_typ = template.typ
+        resp.synced_to_crm = False
+    else:
+        db.add(CheckinResponse(
+            user_id=user.id,
+            course_id=module.course_id if module else "",
+            lesson_id=lesson_id,
+            template_typ=template.typ,
+            week_index=week_index,
+            answers=answers,
+            status="submitted",
+            submitted_at=now,
+        ))
+
+    # Lektion als abgeschlossen markieren (zählt in den Fortschritt)
+    progress = (await db.execute(
+        select(LessonProgress).where(
+            LessonProgress.user_id == user.id, LessonProgress.lesson_id == lesson_id
+        )
+    )).scalar_one_or_none()
+    if progress:
+        progress.completed = True
+        progress.completed_at = now
+    else:
+        db.add(LessonProgress(user_id=user.id, lesson_id=lesson_id, completed=True, completed_at=now))
+
+    return {"ok": True, "submitted_at": now.isoformat()}
