@@ -142,36 +142,38 @@ export default function AdminCourseDetail() {
             inputClassName="text-gray-500 w-full"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <HubEnabledToggle courseId={course.id} initial={course.hub_enabled} onChange={load} />
-          {course.hub_enabled && (
+        {/* Zwei klar getrennte Reihen: oben Einstellungen, darunter Erstellen-
+            Aktionen. Deterministisch, kein ml-auto-/Umbruch-Geraten. */}
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <HubEnabledToggle courseId={course.id} initial={course.hub_enabled} onChange={load} />
+            {course.hub_enabled && (
+              <Link
+                to={`/admin/course/${courseId}/hub`}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: 'var(--radius-pill)',
+                  background: 'var(--berry)',
+                  color: '#fff',
+                  textDecoration: 'none',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  letterSpacing: '0.3px',
+                }}
+              >
+                Mitgliederbereich bearbeiten
+              </Link>
+            )}
             <Link
-              to={`/admin/course/${courseId}/hub`}
-              style={{
-                padding: '8px 18px',
-                borderRadius: 'var(--radius-pill)',
-                background: 'var(--berry)',
-                color: '#fff',
-                textDecoration: 'none',
-                fontSize: 13,
-                fontWeight: 700,
-                letterSpacing: '0.3px',
-              }}
+              to={`/admin/course/${courseId}/announcements`}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-[var(--nora-pink-dark)] transition-colors"
+              title="Ankündigungen verwalten"
             >
-              Mitgliederbereich bearbeiten
+              <Megaphone size={14} />
+              Ankündigungen
             </Link>
-          )}
-          <Link
-            to={`/admin/course/${courseId}/announcements`}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-[var(--nora-pink-dark)] transition-colors"
-            title="Ankündigungen verwalten"
-          >
-            <Megaphone size={14} />
-            Ankündigungen
-          </Link>
-          {/* Inhalt-Erstellen-Buttons gruppiert + nach rechts; brechen zusammen
-              um statt den Check-in-Button allein abzusetzen. */}
-          <div className="flex flex-wrap items-center gap-3 ml-auto">
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => { setShowCheckin(false); setShowCreate(!showCreate); }}
               className="px-4 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors"
