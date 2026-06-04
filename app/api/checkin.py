@@ -6,7 +6,7 @@ in der Modulliste, rendert im Lektions-Player-Frame und zählt über LessonProgr
 in den Fortschritt (Phase 3).
 """
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
@@ -25,6 +25,17 @@ router = APIRouter()
 
 # Schritt-Typen, die keine Antwort erwarten (reine Anzeige).
 _NON_ANSWER_TYPES = {"intro", "bestaetigung"}
+
+# Antwort-Limits: bremsen einen böswilligen eingeloggten Client (Storage-DoS)
+# und halten die Datenqualität sauber (keine Junk-Keys für spätere Auswertung).
+_MAX_ANSWER_STR = 5000
+_MAX_ANSWER_LIST = 50
+
+
+def _iso_utc(dt) -> str:
+    """ISO-8601 mit 'Z'. utc_now() liefert naive UTC; ohne 'Z' würde Node's
+    new Date() den String als LOKALE Zeit parsen → Zeitversatz im CRM."""
+    return dt.isoformat() + "Z"
 
 _DEFAULT_TITLE = {
     "start": "Check-in: Bestandsaufnahme",
@@ -95,11 +106,12 @@ async def create_checkin_module(
     if data.week_index and not data.title:
         title = f"Check-in Woche {data.week_index}"
 
-    # Ans Ende der Modulliste; gleiche sort_order-Semantik wie beim Video-Modul.
-    existing = (await db.execute(
-        select(Module.id).where(Module.course_id == course.id)
-    )).scalars().all()
-    sort_order = len(existing)
+    # Ans Ende: max(sort_order)+1. len-basiert würde nach dem Löschen eines
+    # Moduls mit einem bestehenden sort_order kollidieren (→ kaputte Reihenfolge).
+    max_so = (await db.execute(
+        select(func.max(Module.sort_order)).where(Module.course_id == course.id)
+    )).scalar()
+    sort_order = (max_so + 1) if max_so is not None else 0
 
     module = Module(course_id=course.id, title=title, sort_order=sort_order)
     db.add(module)
@@ -124,6 +136,10 @@ async def create_checkin_module(
 async def get_checkin_lesson(
     lesson_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
+    # Enrollment wie bei submit/response — sonst könnte jede eingeloggte Klientin
+    # die Formularstruktur fremder Kurse per Lektions-ID auslesen. Admin wird
+    # in der Helferfunktion durchgelassen.
+    await _require_enrollment_for_lesson(db, user, lesson_id)
     lesson, section, module = await _load_checkin_lesson(db, lesson_id)
     template = (
         await db.execute(
@@ -226,6 +242,10 @@ async def submit_checkin(
     Lektion als abgeschlossen markieren. CRM-Sync folgt in Phase 4."""
     await _require_enrollment_for_lesson(db, user, lesson_id)
     lesson, section, module = await _load_checkin_lesson(db, lesson_id)
+    if module is None:
+        # Verwaiste Check-in-Lektion (Section ohne Modul). Sauber abfangen statt
+        # einen Leerstring in die NOT-NULL-FK course_id zu schreiben (→ 500).
+        raise HTTPException(status_code=409, detail="Check-in-Lektion ist keinem Modul zugeordnet")
     template = (await db.execute(
         select(CheckinTemplate).where(CheckinTemplate.id == lesson.checkin_template_id)
     )).scalar_one_or_none()
@@ -235,8 +255,23 @@ async def submit_checkin(
         select(CheckinStep).where(CheckinStep.template_id == template.id)
     )).scalars().all()
 
-    # Pflichtfelder prüfen (intro/bestaetigung erwarten keine Antwort)
     answers = data.answers or {}
+    # Nur bekannte Template-Keys zulassen (Datenqualität für spätere Auswertung)
+    # und Werte begrenzen (Storage-DoS durch eingeloggten Client).
+    valid_keys = {s.key for s in steps}
+    unknown = [k for k in answers if k not in valid_keys]
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"Unbekannte Antwort-Keys: {', '.join(unknown[:5])}")
+    for k, v in answers.items():
+        if isinstance(v, str) and len(v) > _MAX_ANSWER_STR:
+            raise HTTPException(status_code=422, detail=f"Antwort '{k}' ist zu lang")
+        if isinstance(v, list):
+            if len(v) > _MAX_ANSWER_LIST:
+                raise HTTPException(status_code=422, detail=f"Zu viele Werte bei '{k}'")
+            if any(isinstance(item, str) and len(item) > _MAX_ANSWER_STR for item in v):
+                raise HTTPException(status_code=422, detail=f"Antwort '{k}' ist zu lang")
+
+    # Pflichtfelder prüfen (intro/bestaetigung erwarten keine Antwort)
     missing = [
         s.key for s in steps
         if s.pflichtfeld and s.typ not in _NON_ANSWER_TYPES and not _answered(answers.get(s.key))
@@ -264,7 +299,7 @@ async def submit_checkin(
     else:
         db.add(CheckinResponse(
             user_id=user.id,
-            course_id=module.course_id if module else "",
+            course_id=module.course_id,
             lesson_id=lesson_id,
             template_typ=template.typ,
             week_index=week_index,
@@ -291,18 +326,18 @@ async def submit_checkin(
     db.add(CrmOutbox(
         event_type="checkin_response",
         user_id=user.id,
-        course_id=module.course_id if module else None,
+        course_id=module.course_id,
         payload={
             "event_type": "checkin_response",
             "email": user.email,
             "user_id": user.id,
-            "course_id": module.course_id if module else None,
+            "course_id": module.course_id,
             "lesson_id": lesson_id,
             "template_typ": template.typ,
             "week_index": week_index,
-            "submitted_at": now.isoformat(),
+            "submitted_at": _iso_utc(now),
             "answers": answers,
         },
     ))
 
-    return {"ok": True, "submitted_at": now.isoformat()}
+    return {"ok": True, "submitted_at": _iso_utc(now)}

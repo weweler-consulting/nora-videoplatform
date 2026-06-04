@@ -322,6 +322,7 @@ async def test_submit_enqueues_crm_outbox(client, session):
     assert p["template_typ"] == "laufend"
     assert p["week_index"] == 1
     assert p["answers"]["wohlbefinden"] == 6
+    assert p["submitted_at"].endswith("Z")  # offset-aware → CRM parst als UTC
     assert rows[0].synced_at is None
 
 
@@ -400,3 +401,157 @@ async def test_crm_sync_retries_on_failure(client, session, monkeypatch):
     assert outbox[0].synced_at is None
     assert outbox[0].retry_count == 1
     assert "http 500" in (outbox[0].last_error or "")
+
+
+# ---- Review-Fixes 1-6 ----
+
+@pytest.mark.asyncio
+async def test_create_checkin_module_sort_order_is_max_plus_one(client, session):
+    """Fix 1: nach einem Modul mit hohem sort_order (Lücke nach Löschungen) bekommt
+    der neue Check-in max+1, nicht len → keine Kollision."""
+    await seed_checkin_templates()
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    session.add(Module(course_id=course.id, title="Bestehend", sort_order=5))
+    await session.commit()
+
+    created = (await client.post(
+        "/api/v1/checkin/modules", headers=_auth(admin),
+        json={"course_id": course.id, "template_typ": "start"},
+    )).json()
+    mod = (await session.execute(_select(Module).where(Module.id == created["module_id"]))).scalar_one()
+    assert mod.sort_order == 6
+
+
+@pytest.mark.asyncio
+async def test_get_checkin_lesson_requires_enrollment(client, session):
+    """Fix 3: GET /checkin/lessons/{id} ist enrollment-geschützt."""
+    await seed_checkin_templates()
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    created = (await client.post(
+        "/api/v1/checkin/modules", headers=_auth(admin),
+        json={"course_id": course.id, "template_typ": "start"},
+    )).json()
+    lesson_id = created["lesson_id"]
+
+    fremd = await _mk_user(session, admin=False)
+    r = await client.get(f"/api/v1/checkin/lessons/{lesson_id}", headers=_auth(fremd))
+    assert r.status_code == 403
+
+    await _enroll(session, fremd.id, course.id)
+    r2 = await client.get(f"/api/v1/checkin/lessons/{lesson_id}", headers=_auth(fremd))
+    assert r2.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_submit_rejects_unknown_keys_and_oversized(client, session):
+    """Fix 5: unbekannte Keys + überlange Werte → 422."""
+    await seed_checkin_templates()
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    created = (await client.post(
+        "/api/v1/checkin/modules", headers=_auth(admin),
+        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1},
+    )).json()
+    lesson_id = created["lesson_id"]
+    klientin = await _mk_user(session, admin=False)
+    await _enroll(session, klientin.id, course.id)
+
+    base = {"wohlbefinden": 7, "energie": 7, "heisshunger": "gleich"}
+    r = await client.post(f"/api/v1/checkin/lessons/{lesson_id}/submit", headers=_auth(klientin),
+                          json={"answers": {**base, "boeser_key": "x"}})
+    assert r.status_code == 422
+    r2 = await client.post(f"/api/v1/checkin/lessons/{lesson_id}/submit", headers=_auth(klientin),
+                           json={"answers": {**base, "win": "a" * 6000}})
+    assert r2.status_code == 422
+    # gültig bleibt gültig
+    r3 = await client.post(f"/api/v1/checkin/lessons/{lesson_id}/submit", headers=_auth(klientin),
+                           json={"answers": base})
+    assert r3.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_submit_orphaned_lesson_returns_409(client, session):
+    """Fix 6: verwaiste Check-in-Lektion (Modul fehlt) → sauberes 409 statt FK-500."""
+    from sqlalchemy import delete
+    await seed_checkin_templates()
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    created = (await client.post(
+        "/api/v1/checkin/modules", headers=_auth(admin),
+        json={"course_id": course.id, "template_typ": "start"},
+    )).json()
+    await session.execute(delete(Module).where(Module.id == created["module_id"]))
+    await session.commit()
+
+    r = await client.post(f"/api/v1/checkin/lessons/{created['lesson_id']}/submit", headers=_auth(admin),
+                          json={"answers": {"hauptziel": ["Mehr Energie"], "energie": 5,
+                                            "nachmittagstief": "selten", "heisshunger": "selten",
+                                            "fruehstueck_status": "herzhaft & eiweißreich"}})
+    assert r.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_crm_sync_accepts_204(client, session, monkeypatch):
+    """Fix 4: jeder 2xx (z. B. 204) zählt als Erfolg."""
+    from app.core import crm_sync
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "crm_webhook_url", "https://crm.test/hook")
+    monkeypatch.setattr(settings, "crm_checkin_secret", "s")
+    _FakeClient.calls = []
+    _FakeClient.status = 204
+    monkeypatch.setattr(crm_sync.httpx, "AsyncClient", _FakeClient)
+
+    await seed_checkin_templates()
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    created = (await client.post("/api/v1/checkin/modules", headers=_auth(admin),
+                                 json={"course_id": course.id, "template_typ": "start"})).json()
+    klientin = await _mk_user(session, admin=False)
+    await _enroll(session, klientin.id, course.id)
+    await client.post(f"/api/v1/checkin/lessons/{created['lesson_id']}/submit", headers=_auth(klientin),
+                      json={"answers": {"hauptziel": ["Mehr Energie"], "energie": 7,
+                                        "nachmittagstief": "selten", "heisshunger": "selten",
+                                        "fruehstueck_status": "herzhaft & eiweißreich"}})
+    n = await crm_sync.process_crm_outbox()
+    assert n == 1
+    ob = (await session.execute(_select(CrmOutbox))).scalars().first()
+    assert ob.synced_at is not None
+
+
+@pytest.mark.asyncio
+async def test_crm_sync_parks_after_max_retries(client, session, monkeypatch):
+    """Fix 4: nach MAX_RETRIES wird die Zeile geparkt (nicht mehr gepostet)."""
+    from app.core import crm_sync
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "crm_webhook_url", "https://crm.test/hook")
+    monkeypatch.setattr(settings, "crm_checkin_secret", "s")
+    _FakeClient.calls = []
+    _FakeClient.status = 404
+    monkeypatch.setattr(crm_sync.httpx, "AsyncClient", _FakeClient)
+
+    await seed_checkin_templates()
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    created = (await client.post("/api/v1/checkin/modules", headers=_auth(admin),
+                                 json={"course_id": course.id, "template_typ": "start"})).json()
+    klientin = await _mk_user(session, admin=False)
+    await _enroll(session, klientin.id, course.id)
+    await client.post(f"/api/v1/checkin/lessons/{created['lesson_id']}/submit", headers=_auth(klientin),
+                      json={"answers": {"hauptziel": ["Mehr Energie"], "energie": 7,
+                                        "nachmittagstief": "selten", "heisshunger": "selten",
+                                        "fruehstueck_status": "herzhaft & eiweißreich"}})
+    ob = (await session.execute(_select(CrmOutbox))).scalars().one()
+    ob.retry_count = crm_sync.MAX_RETRIES - 1
+    await session.commit()
+
+    n = await crm_sync.process_crm_outbox()
+    assert n == 0
+    await session.refresh(ob)
+    assert ob.retry_count == crm_sync.MAX_RETRIES
+    assert ob.synced_at is None
+    # Zeile wird ab jetzt ignoriert
+    n2 = await crm_sync.process_crm_outbox()
+    assert n2 == 0
+    assert len(_FakeClient.calls) == 1

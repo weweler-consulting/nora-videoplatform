@@ -28,6 +28,18 @@ def _configured() -> bool:
     return bool(settings.crm_webhook_url and settings.crm_checkin_secret)
 
 
+def _record_failure(row, error: str) -> None:
+    """Fehlversuch zählen; beim Erreichen von MAX_RETRIES laut loggen, damit eine
+    aufgegebene Zeile (z. B. Kontakt fehlt im CRM) nicht still verschwindet."""
+    row.retry_count += 1
+    row.last_error = error[:500]
+    if row.retry_count >= MAX_RETRIES:
+        logger.warning(
+            f"CRM-Sync gibt auf nach {MAX_RETRIES} Versuchen: outbox={row.id} "
+            f"lesson={row.payload.get('lesson_id')} email={row.payload.get('email')} ({error})"
+        )
+
+
 async def process_crm_outbox() -> int:
     """Eine Runde: offene Outbox-Zeilen abarbeiten. Gibt die Anzahl erfolgreich
     gesyncter Zeilen zurück."""
@@ -58,11 +70,10 @@ async def process_crm_outbox() -> int:
                         headers={"X-Webhook-Secret": settings.crm_checkin_secret},
                     )
                 except Exception as e:  # Netzwerk/Timeout → retry
-                    row.retry_count += 1
-                    row.last_error = f"request: {e}"[:500]
+                    _record_failure(row, f"request: {type(e).__name__}")
                     continue
 
-                if resp.status_code in (200, 201):
+                if 200 <= resp.status_code < 300:  # jeder 2xx zählt (z. B. 202/204)
                     row.synced_at = utc_now()
                     # Best-effort Flag an der Antwort (oldest-first → konsistent)
                     if row.user_id and row.payload.get("lesson_id"):
@@ -76,8 +87,8 @@ async def process_crm_outbox() -> int:
                         )
                     synced += 1
                 else:
-                    row.retry_count += 1
-                    row.last_error = f"http {resp.status_code}: {resp.text[:300]}"
+                    # Nur Status, kein Response-Body → keine PII/Health-Daten im Log/DB.
+                    _record_failure(row, f"http {resp.status_code}")
 
         await db.commit()
         if synced:

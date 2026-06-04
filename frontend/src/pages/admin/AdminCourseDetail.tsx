@@ -26,7 +26,10 @@ export default function AdminCourseDetail() {
   const handleCreateModule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !courseId) return;
-    const sortOrder = course ? course.modules.length : 0;
+    // max(sort_order)+1 statt Anzahl — sonst Kollision nach gelöschtem Modul.
+    const sortOrder = course && course.modules.length
+      ? Math.max(...course.modules.map((m) => m.sort_order)) + 1
+      : 0;
 
     // Create module
     const { id: moduleId } = await api.createModule({
@@ -82,9 +85,11 @@ export default function AdminCourseDetail() {
     [next[idx], next[target]] = [next[target], next[idx]];
     setCourse({ ...course, modules: next });
     try {
+      // Echte sort_order-Werte tauschen (nicht Array-Indizes) — robust auch bei
+      // Lücken/Nicht-0-basierter Nummerierung.
       await Promise.all([
-        api.updateModule(a.id, { sort_order: target }),
-        api.updateModule(b.id, { sort_order: idx }),
+        api.updateModule(a.id, { sort_order: b.sort_order }),
+        api.updateModule(b.id, { sort_order: a.sort_order }),
       ]);
       load();
     } catch {
