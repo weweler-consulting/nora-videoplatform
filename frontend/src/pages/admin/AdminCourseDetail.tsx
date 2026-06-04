@@ -169,19 +169,23 @@ export default function AdminCourseDetail() {
             <Megaphone size={14} />
             Ankündigungen
           </Link>
-          <button
-            onClick={() => { setShowCheckin(false); setShowCreate(!showCreate); }}
-            className="px-4 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors"
-          >
-            + Neues Modul
-          </button>
-          <button
-            onClick={() => { setShowCreate(false); setShowCheckin(!showCheckin); }}
-            className="flex items-center gap-1.5 px-4 py-2 border border-[var(--nora-pink)] text-[var(--nora-pink-dark)] rounded-lg font-medium hover:bg-[var(--nora-pink-light)] transition-colors"
-          >
-            <ClipboardList size={16} />
-            + Neues Check-In-Formular
-          </button>
+          {/* Inhalt-Erstellen-Buttons gruppiert + nach rechts; brechen zusammen
+              um statt den Check-in-Button allein abzusetzen. */}
+          <div className="flex flex-wrap items-center gap-3 ml-auto">
+            <button
+              onClick={() => { setShowCheckin(false); setShowCreate(!showCreate); }}
+              className="px-4 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors"
+            >
+              + Neues Modul
+            </button>
+            <button
+              onClick={() => { setShowCreate(false); setShowCheckin(!showCheckin); }}
+              className="flex items-center gap-1.5 px-4 py-2 border border-[var(--nora-pink)] text-[var(--nora-pink-dark)] rounded-lg font-medium hover:bg-[var(--nora-pink-light)] transition-colors"
+            >
+              <ClipboardList size={16} />
+              + Neues Check-In-Formular
+            </button>
+          </div>
         </div>
       </div>
 
