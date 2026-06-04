@@ -111,14 +111,17 @@ Quelle: `app/models/course.py`.
 
 ## 9a. Deployment / ENV für CRM-Sync (Phase 4)
 
-Damit der Sync läuft, müssen **drei** ENV-Variablen gesetzt sein (sonst ist der
-Sync-Loop ein No-op, Antworten bleiben in der Plattform mit `synced_to_crm=0`):
+Damit der Sync läuft, müssen **zwei** ENV-Variablen gesetzt sein, **beide nur auf
+dem Kurse-Container** (sonst ist der Sync-Loop ein No-op, Antworten bleiben in der
+Plattform mit `synced_to_crm=0`):
 
 - **video-platform** (Kurse-Container, `/app/data/env.sh`, export-Syntax):
   - `NORA_CRM_WEBHOOK_URL=https://<crm-domain>/api/webhooks/course-checkin`
-  - `NORA_CRM_CHECKIN_SECRET=<zufälliger Wert, z. B. openssl rand -hex 32>`
-- **nora-crm** (CRM-Container, `/app/data/.env`, dotenv-Syntax):
-  - `COURSE_CHECKIN_WEBHOOK_SECRET=<derselbe Wert wie oben>`
+  - `NORA_CRM_CHECKIN_SECRET=<Wert des bestehenden CRM-WEBHOOK_SECRET>`
+
+Der CRM-Webhook authentifiziert gegen das **bereits vorhandene `WEBHOOK_SECRET`**
+(dasselbe, das Freebie-/Bewerbungs-Webhooks nutzen) — **keine neue Variable im CRM**.
+`NORA_CRM_CHECKIN_SECRET` muss exakt diesen Wert tragen.
 
 CRM-Migration `20260604120000_add_checkin_response` läuft automatisch beim
 nächsten Deploy via `prisma migrate deploy` (additiv, neue Tabelle).
