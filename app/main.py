@@ -15,6 +15,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from app.core.db import engine, Base
 from app.core.drip_notifier import drip_notifier_loop
+from app.core.crm_sync import crm_sync_loop
 from app.core.ratelimit import limiter
 from app.api import auth, courses, hub, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook, attachments, integrations, admin_hub, announcements, checkin
 from app.models import hub as _hub_models  # noqa: F401 — register Hub tables with Base
@@ -195,8 +196,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Check-in template seed failed: {e}")
     task = asyncio.create_task(drip_notifier_loop())
+    crm_task = asyncio.create_task(crm_sync_loop())
     yield
     task.cancel()
+    crm_task.cancel()
 
 
 app = FastAPI(title="Nora Videoplatform API", version="0.1.0", lifespan=lifespan)

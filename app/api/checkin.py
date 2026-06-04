@@ -14,7 +14,7 @@ from app.core.auth import get_current_user, require_admin
 from app.core.time import utc_now
 from app.models.user import User
 from app.models.course import Course, Module, Section, Lesson, LessonProgress
-from app.models.checkin import CheckinTemplate, CheckinStep, CheckinResponse
+from app.models.checkin import CheckinTemplate, CheckinStep, CheckinResponse, CrmOutbox
 from app.api.progress import _require_enrollment_for_lesson
 from app.schemas.checkin import (
     CheckinTemplateOut, CheckinStepOut, CheckinLessonOut,
@@ -284,5 +284,25 @@ async def submit_checkin(
         progress.completed_at = now
     else:
         db.add(LessonProgress(user_id=user.id, lesson_id=lesson_id, completed=True, completed_at=now))
+
+    # CRM-Sync nicht-blockierend über die Outbox anstoßen. In derselben
+    # Transaktion wie die Antwort → entweder beides oder nichts (kein verlorener
+    # Sync). Der Background-Loop (app/core/crm_sync.py) liefert ab.
+    db.add(CrmOutbox(
+        event_type="checkin_response",
+        user_id=user.id,
+        course_id=module.course_id if module else None,
+        payload={
+            "event_type": "checkin_response",
+            "email": user.email,
+            "user_id": user.id,
+            "course_id": module.course_id if module else None,
+            "lesson_id": lesson_id,
+            "template_typ": template.typ,
+            "week_index": week_index,
+            "submitted_at": now.isoformat(),
+            "answers": answers,
+        },
+    ))
 
     return {"ok": True, "submitted_at": now.isoformat()}

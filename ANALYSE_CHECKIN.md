@@ -109,6 +109,21 @@ Quelle: `app/models/course.py`.
 - Background-Loop (Muster `drip_notifier`) → `POST` an neuen CRM-Webhook → match by email → speichern (siehe offene Entscheidung: `FunnelEvent.metadata` vs. dediziertes `CheckInResponse`-Modell).
 - Nicht-blockierend, Retry über `crm_outbox.retry_count`.
 
+## 9a. Deployment / ENV für CRM-Sync (Phase 4)
+
+Damit der Sync läuft, müssen **drei** ENV-Variablen gesetzt sein (sonst ist der
+Sync-Loop ein No-op, Antworten bleiben in der Plattform mit `synced_to_crm=0`):
+
+- **video-platform** (Kurse-Container, `/app/data/env.sh`, export-Syntax):
+  - `NORA_CRM_WEBHOOK_URL=https://<crm-domain>/api/webhooks/course-checkin`
+  - `NORA_CRM_CHECKIN_SECRET=<zufälliger Wert, z. B. openssl rand -hex 32>`
+- **nora-crm** (CRM-Container, `/app/data/.env`, dotenv-Syntax):
+  - `COURSE_CHECKIN_WEBHOOK_SECRET=<derselbe Wert wie oben>`
+
+CRM-Migration `20260604120000_add_checkin_response` läuft automatisch beim
+nächsten Deploy via `prisma migrate deploy` (additiv, neue Tabelle).
+Danach `cloudron restart` für beide Apps. Matching Klientin↔Kontakt über E-Mail.
+
 ## 10. Entscheidungen (bestätigt 2026-06-04)
 1. **Andockpunkt:** ✅ **Lektions-Typ** — Check-in = 1-Lektion-Modul, Lektion `type='checkin'`. Nutzt Player-Frame + `LessonProgress` + Lektions-Reorder.
 2. **Reorder:** ✅ **Hoch/Runter-Pfeile für Module** ergänzen (gleiche Mechanik wie Lektionen). Kein dnd-kit.

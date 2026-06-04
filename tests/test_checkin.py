@@ -6,9 +6,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import create_access_token, hash_password
 from app.core.checkin_seed import seed_checkin_templates
 from app.models.course import Course, Module, Section, Lesson, Enrollment, LessonProgress
-from app.models.checkin import CheckinResponse
+from app.models.checkin import CheckinResponse, CrmOutbox
 from app.models.user import User
 from sqlalchemy import select as _select
+
+
+class _FakeResp:
+    def __init__(self, status_code: int, text: str = ""):
+        self.status_code = status_code
+        self.text = text
+
+
+class _FakeClient:
+    """Ersetzt httpx.AsyncClient im CRM-Sync-Test."""
+    calls: list = []
+    status: int = 200
+
+    def __init__(self, *a, **k):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def post(self, url, json=None, headers=None):
+        _FakeClient.calls.append({"url": url, "json": json, "headers": headers})
+        return _FakeResp(_FakeClient.status)
 
 
 async def _mk_user(session: AsyncSession, *, admin: bool = False) -> User:
@@ -270,3 +295,108 @@ async def test_edit_resubmit_updates_and_resets_sync(client, session):
     await session.refresh(resp)
     assert resp.answers["wohlbefinden"] == 9
     assert resp.synced_to_crm is False
+
+
+@pytest.mark.asyncio
+async def test_submit_enqueues_crm_outbox(client, session):
+    await seed_checkin_templates()
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    created = (await client.post(
+        "/api/v1/checkin/modules", headers=_auth(admin),
+        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1},
+    )).json()
+    lesson_id = created["lesson_id"]
+    klientin = await _mk_user(session, admin=False)
+    await _enroll(session, klientin.id, course.id)
+
+    await client.post(f"/api/v1/checkin/lessons/{lesson_id}/submit", headers=_auth(klientin),
+                      json={"answers": {"wohlbefinden": 6, "energie": 6, "heisshunger": "gleich"}})
+
+    rows = (await session.execute(_select(CrmOutbox))).scalars().all()
+    assert len(rows) == 1
+    p = rows[0].payload
+    assert p["event_type"] == "checkin_response"
+    assert p["email"] == klientin.email
+    assert p["lesson_id"] == lesson_id
+    assert p["template_typ"] == "laufend"
+    assert p["week_index"] == 1
+    assert p["answers"]["wohlbefinden"] == 6
+    assert rows[0].synced_at is None
+
+
+@pytest.mark.asyncio
+async def test_crm_sync_processes_outbox(client, session, monkeypatch):
+    from app.core import crm_sync
+    from app.core.config import settings
+
+    # CRM-Sync konfigurieren + httpx faken
+    monkeypatch.setattr(settings, "crm_webhook_url", "https://crm.test/api/webhooks/course-checkin")
+    monkeypatch.setattr(settings, "crm_checkin_secret", "shhh-secret")
+    _FakeClient.calls = []
+    _FakeClient.status = 200
+    monkeypatch.setattr(crm_sync.httpx, "AsyncClient", _FakeClient)
+
+    await seed_checkin_templates()
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    created = (await client.post(
+        "/api/v1/checkin/modules", headers=_auth(admin),
+        json={"course_id": course.id, "template_typ": "start"},
+    )).json()
+    lesson_id = created["lesson_id"]
+    klientin = await _mk_user(session, admin=False)
+    await _enroll(session, klientin.id, course.id)
+    await client.post(f"/api/v1/checkin/lessons/{lesson_id}/submit", headers=_auth(klientin),
+                      json={"answers": {"hauptziel": ["Mehr Energie"], "energie": 7,
+                                        "nachmittagstief": "selten", "heisshunger": "selten",
+                                        "fruehstueck_status": "herzhaft & eiweißreich"}})
+
+    n = await crm_sync.process_crm_outbox()
+    assert n == 1
+    # POST mit Secret-Header an die konfigurierte URL
+    assert len(_FakeClient.calls) == 1
+    call = _FakeClient.calls[0]
+    assert call["url"] == "https://crm.test/api/webhooks/course-checkin"
+    assert call["headers"]["X-Webhook-Secret"] == "shhh-secret"
+    assert call["json"]["email"] == klientin.email
+
+    # Outbox-Zeile als gesynct markiert, Antwort-Flag gesetzt
+    outbox = (await session.execute(_select(CrmOutbox))).scalars().all()
+    assert outbox[0].synced_at is not None
+    resp = (await session.execute(_select(CheckinResponse).where(
+        CheckinResponse.lesson_id == lesson_id))).scalar_one()
+    assert resp.synced_to_crm is True
+
+
+@pytest.mark.asyncio
+async def test_crm_sync_retries_on_failure(client, session, monkeypatch):
+    from app.core import crm_sync
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "crm_webhook_url", "https://crm.test/hook")
+    monkeypatch.setattr(settings, "crm_checkin_secret", "s")
+    _FakeClient.calls = []
+    _FakeClient.status = 500
+    monkeypatch.setattr(crm_sync.httpx, "AsyncClient", _FakeClient)
+
+    await seed_checkin_templates()
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    created = (await client.post(
+        "/api/v1/checkin/modules", headers=_auth(admin),
+        json={"course_id": course.id, "template_typ": "start"},
+    )).json()
+    klientin = await _mk_user(session, admin=False)
+    await _enroll(session, klientin.id, course.id)
+    await client.post(f"/api/v1/checkin/lessons/{created['lesson_id']}/submit", headers=_auth(klientin),
+                      json={"answers": {"hauptziel": ["Mehr Energie"], "energie": 7,
+                                        "nachmittagstief": "selten", "heisshunger": "selten",
+                                        "fruehstueck_status": "herzhaft & eiweißreich"}})
+
+    n = await crm_sync.process_crm_outbox()
+    assert n == 0
+    outbox = (await session.execute(_select(CrmOutbox))).scalars().all()
+    assert outbox[0].synced_at is None
+    assert outbox[0].retry_count == 1
+    assert "http 500" in (outbox[0].last_error or "")
