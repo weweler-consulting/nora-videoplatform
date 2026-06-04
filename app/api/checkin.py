@@ -252,7 +252,7 @@ async def submit_checkin(
     if not template:
         raise HTTPException(status_code=404, detail="Template nicht gefunden")
     steps = (await db.execute(
-        select(CheckinStep).where(CheckinStep.template_id == template.id)
+        select(CheckinStep).where(CheckinStep.template_id == template.id).order_by(CheckinStep.sort_order)
     )).scalars().all()
 
     answers = data.answers or {}
@@ -281,6 +281,13 @@ async def submit_checkin(
 
     overrides = lesson.checkin_overrides or {}
     week_index = overrides.get("week_index")
+
+    # Tatsächlich gestellte Fragen (mit Overrides) für die CRM-Anzeige.
+    questions = [
+        {"key": s.key, "frage": s.frage, "typ": s.typ, "skala_max": s.skala_max}
+        for s in _merge_steps(steps, overrides)
+        if s.typ not in _NON_ANSWER_TYPES
+    ]
 
     # Upsert auf (user, lesson). Bearbeiten setzt synced_to_crm zurück → re-sync.
     resp = (await db.execute(
@@ -337,6 +344,7 @@ async def submit_checkin(
             "week_index": week_index,
             "submitted_at": _iso_utc(now),
             "answers": answers,
+            "questions": questions,
         },
     ))
 

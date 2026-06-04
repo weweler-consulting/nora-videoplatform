@@ -555,3 +555,33 @@ async def test_crm_sync_parks_after_max_retries(client, session, monkeypatch):
     n2 = await crm_sync.process_crm_outbox()
     assert n2 == 0
     assert len(_FakeClient.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_submit_includes_ordered_questions_in_outbox(client, session):
+    await seed_checkin_templates()
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    created = (await client.post(
+        "/api/v1/checkin/modules", headers=_auth(admin),
+        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1},
+    )).json()
+    lesson_id = created["lesson_id"]
+    await client.put(f"/api/v1/checkin/lessons/{lesson_id}", headers=_auth(admin),
+                     json={"step_overrides": {"umsetzung": {"frage": "Eigene Wochenfrage?"}}})
+
+    klientin = await _mk_user(session, admin=False)
+    await _enroll(session, klientin.id, course.id)
+    await client.post(f"/api/v1/checkin/lessons/{lesson_id}/submit", headers=_auth(klientin),
+                      json={"answers": {"wohlbefinden": 8, "energie": 6, "heisshunger": "gleich"}})
+
+    row = (await session.execute(_select(CrmOutbox).order_by(CrmOutbox.created_at.desc()))).scalars().first()
+    questions = row.payload["questions"]
+    typen = [q["typ"] for q in questions]
+    assert "intro" not in typen and "bestaetigung" not in typen
+    keys = [q["key"] for q in questions]
+    assert keys[:3] == ["wohlbefinden", "energie", "heisshunger"]
+    wohl = next(q for q in questions if q["key"] == "wohlbefinden")
+    assert wohl["typ"] == "skala" and wohl["skala_max"] == 10
+    ums = next(q for q in questions if q["key"] == "umsetzung")
+    assert ums["frage"] == "Eigene Wochenfrage?"
