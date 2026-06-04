@@ -71,8 +71,8 @@ export default function AdminCourseDetail() {
         <span className="text-gray-700">{course.title}</span>
       </div>
 
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex-1 min-w-0 mr-4">
+      <div className="mb-4">
+        <div className="min-w-0 mb-4">
           <EditableCourseField
             courseId={course.id}
             field="title"
@@ -91,7 +91,7 @@ export default function AdminCourseDetail() {
             inputClassName="text-gray-500 w-full"
           />
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-3">
           <HubEnabledToggle courseId={course.id} initial={course.hub_enabled} onChange={load} />
           {course.hub_enabled && (
             <Link
