@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Megaphone } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Megaphone, ClipboardList, ChevronUp, ChevronDown } from 'lucide-react';
 import { api, type CourseDetail, type ModuleItem } from '../../lib/api';
 
 export default function AdminCourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
+  const navigate = useNavigate();
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [showCheckin, setShowCheckin] = useState(false);
+  const [checkinTyp, setCheckinTyp] = useState<'start' | 'laufend'>('start');
+  const [checkinWeek, setCheckinWeek] = useState<number | ''>('');
+  const [reordering, setReordering] = useState(false);
 
   const load = () => {
     if (courseId) {
@@ -42,10 +47,51 @@ export default function AdminCourseDetail() {
     load();
   };
 
+  const handleCreateCheckin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!courseId) return;
+    const { lesson_id } = await api.createCheckinModule({
+      course_id: courseId,
+      template_typ: checkinTyp,
+      ...(checkinTyp === 'laufend' && checkinWeek ? { week_index: Number(checkinWeek) } : {}),
+    });
+    setShowCheckin(false);
+    setCheckinWeek('');
+    // Direkt in den Editor, damit Nora Wochenfrage/Texte anpassen kann.
+    navigate(`/admin/course/${courseId}/checkin/${lesson_id}`);
+  };
+
   const handleDeleteModule = async (moduleId: string, title: string) => {
     if (!confirm(`Modul "${title}" wirklich löschen?`)) return;
     await api.deleteModule(moduleId);
     load();
+  };
+
+  // Modul-Reorder via bestehendes PUT /modules/{id} mit sort_order — gleiche
+  // Mechanik wie die Lektions-Pfeile, jetzt auch für Module (vorher gar nicht
+  // sortierbar). Nur die beiden betroffenen Module werden geschrieben.
+  const handleMoveModule = async (idx: number, direction: -1 | 1) => {
+    if (!course || reordering) return;
+    const target = idx + direction;
+    if (target < 0 || target >= course.modules.length) return;
+    const a = course.modules[idx];
+    const b = course.modules[target];
+    setReordering(true);
+    // Optimistisch in der UI tauschen
+    const next = [...course.modules];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    setCourse({ ...course, modules: next });
+    try {
+      await Promise.all([
+        api.updateModule(a.id, { sort_order: target }),
+        api.updateModule(b.id, { sort_order: idx }),
+      ]);
+      load();
+    } catch {
+      load(); // Server-Wahrheit wiederherstellen
+    } finally {
+      setReordering(false);
+    }
   };
 
   if (loading) {
@@ -119,10 +165,17 @@ export default function AdminCourseDetail() {
             Ankündigungen
           </Link>
           <button
-            onClick={() => setShowCreate(!showCreate)}
+            onClick={() => { setShowCheckin(false); setShowCreate(!showCreate); }}
             className="px-4 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors"
           >
             + Neues Modul
+          </button>
+          <button
+            onClick={() => { setShowCreate(false); setShowCheckin(!showCheckin); }}
+            className="flex items-center gap-1.5 px-4 py-2 border border-[var(--nora-pink)] text-[var(--nora-pink-dark)] rounded-lg font-medium hover:bg-[var(--nora-pink-light)] transition-colors"
+          >
+            <ClipboardList size={16} />
+            + Neues Check-In-Formular
           </button>
         </div>
       </div>
@@ -161,6 +214,60 @@ export default function AdminCourseDetail() {
         </form>
       )}
 
+      {showCheckin && (
+        <form onSubmit={handleCreateCheckin} className="bg-white rounded-2xl p-6 mb-6 shadow-sm space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Formular-Typ</label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setCheckinTyp('start')}
+                className={`px-4 py-2 rounded-lg text-sm border transition-colors ${checkinTyp === 'start' ? 'bg-[var(--nora-pink)] text-white border-transparent' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+              >
+                Bestandsaufnahme (vor Start)
+              </button>
+              <button
+                type="button"
+                onClick={() => setCheckinTyp('laufend')}
+                className={`px-4 py-2 rounded-lg text-sm border transition-colors ${checkinTyp === 'laufend' ? 'bg-[var(--nora-pink)] text-white border-transparent' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+              >
+                Wöchentlicher Check-in
+              </button>
+            </div>
+          </div>
+          {checkinTyp === 'laufend' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Woche (optional)</label>
+              <input
+                type="number"
+                min={1}
+                max={12}
+                value={checkinWeek}
+                onChange={(e) => setCheckinWeek(e.target.value ? parseInt(e.target.value) : '')}
+                className="w-32 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--nora-pink)] focus:border-transparent"
+                placeholder="z.B. 1"
+              />
+              <p className="text-xs text-gray-400 mt-1">Setzt den Titel & die Default-Wochenfrage. Im Editor anpassbar.</p>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <button
+              type="submit"
+              className="px-5 py-2 bg-[var(--nora-pink)] text-white rounded-lg font-medium hover:bg-[var(--nora-pink-dark)] transition-colors"
+            >
+              Erstellen & bearbeiten
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCheckin(false)}
+              className="px-5 py-2 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Abbrechen
+            </button>
+          </div>
+        </form>
+      )}
+
       {course.modules.length === 0 ? (
         <div className="bg-white rounded-2xl p-8 text-center text-gray-500">
           Noch keine Module. Erstelle dein erstes Modul.
@@ -169,24 +276,54 @@ export default function AdminCourseDetail() {
         <div className="space-y-3">
           {course.modules.map((module, idx) => {
             const lessonCount = module.sections.reduce((sum, s) => sum + s.lessons.length, 0);
+            const editTarget = module.is_checkin && module.checkin_lesson_id
+              ? `/admin/course/${courseId}/checkin/${module.checkin_lesson_id}`
+              : `/admin/course/${courseId}/module/${module.id}`;
             return (
               <div
                 key={module.id}
                 className="bg-white rounded-2xl p-5 shadow-sm flex items-center justify-between group"
               >
-                <Link
-                  to={`/admin/course/${courseId}/module/${module.id}`}
-                  className="flex-1 min-w-0 flex items-center gap-4"
-                >
-                  <div className="w-10 h-10 bg-gradient-to-br from-[var(--nora-pink-light)] to-[var(--nora-pink)] rounded-lg flex items-center justify-center text-white font-semibold text-sm shrink-0">
-                    {idx + 1}
+                {/* Reorder-Pfeile */}
+                <div className="flex flex-col mr-2 shrink-0">
+                  <button
+                    onClick={() => handleMoveModule(idx, -1)}
+                    disabled={idx === 0 || reordering}
+                    className="text-gray-300 hover:text-[var(--nora-pink-dark)] disabled:opacity-30 disabled:hover:text-gray-300 transition-colors"
+                    title="Nach oben"
+                  >
+                    <ChevronUp size={18} />
+                  </button>
+                  <button
+                    onClick={() => handleMoveModule(idx, 1)}
+                    disabled={idx === course.modules.length - 1 || reordering}
+                    className="text-gray-300 hover:text-[var(--nora-pink-dark)] disabled:opacity-30 disabled:hover:text-gray-300 transition-colors"
+                    title="Nach unten"
+                  >
+                    <ChevronDown size={18} />
+                  </button>
+                </div>
+                <Link to={editTarget} className="flex-1 min-w-0 flex items-center gap-4">
+                  <div
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-semibold text-sm shrink-0 bg-gradient-to-br ${module.is_checkin ? 'from-[var(--berry)] to-[var(--nora-pink-dark)]' : 'from-[var(--nora-pink-light)] to-[var(--nora-pink)]'}`}
+                  >
+                    {module.is_checkin ? <ClipboardList size={18} /> : idx + 1}
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-800 group-hover:text-[var(--nora-pink-dark)] transition-colors">
-                      {module.title}
-                    </h3>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-gray-800 group-hover:text-[var(--nora-pink-dark)] transition-colors">
+                        {module.title}
+                      </h3>
+                      {module.is_checkin && (
+                        <span className="text-xs font-medium text-[var(--nora-pink-dark)] bg-[var(--nora-pink-light)] px-2 py-0.5 rounded-full">
+                          Check-In{module.checkin_typ === 'start' ? ' · Start' : module.checkin_typ === 'laufend' ? ' · laufend' : ''}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500 mt-0.5">
-                      {lessonCount} Lektionen{module.total_duration > 0 ? ` · ${module.total_duration} Min.` : ''}
+                      {module.is_checkin
+                        ? `Formular${module.checkin_week_index ? ` · Woche ${module.checkin_week_index}` : ''}`
+                        : `${lessonCount} Lektionen${module.total_duration > 0 ? ` · ${module.total_duration} Min.` : ''}`}
                       {module.unlock_after_days > 0 && (
                         <span className="ml-2 text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
                           nach {module.unlock_after_days} Tagen
@@ -198,7 +335,7 @@ export default function AdminCourseDetail() {
                 <div className="flex items-center gap-2 shrink-0 ml-4">
                   <UnlockDaysInput module={module} onSave={load} />
                   <Link
-                    to={`/admin/course/${courseId}/module/${module.id}`}
+                    to={editTarget}
                     className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
                   >
                     Bearbeiten

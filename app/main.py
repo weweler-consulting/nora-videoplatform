@@ -16,7 +16,7 @@ from sqlalchemy import text
 from app.core.db import engine, Base
 from app.core.drip_notifier import drip_notifier_loop
 from app.core.ratelimit import limiter
-from app.api import auth, courses, hub, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook, attachments, integrations, admin_hub, announcements
+from app.api import auth, courses, hub, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook, attachments, integrations, admin_hub, announcements, checkin
 from app.models import hub as _hub_models  # noqa: F401 — register Hub tables with Base
 from app.models import checkin as _checkin_models  # noqa: F401 — register Check-In tables with Base
 from app.core.checkin_seed import seed_checkin_templates
@@ -230,6 +230,7 @@ app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["in
 app.include_router(hub.router, prefix="/api/v1/courses", tags=["hub"])
 app.include_router(admin_hub.router, prefix="/api/v1/admin/courses", tags=["admin_hub"])
 app.include_router(announcements.router, prefix="/api/v1/admin/courses", tags=["announcements"])
+app.include_router(checkin.router, prefix="/api/v1/checkin", tags=["checkin"])
 
 
 @app.get("/api/v1/health")

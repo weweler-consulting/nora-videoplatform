@@ -232,6 +232,26 @@ export const api = {
       body: JSON.stringify(input),
     }),
 
+  // Check-In-Formulare
+  listCheckinTemplates: () =>
+    request<CheckinTemplateInfo[]>('/checkin/templates'),
+  createCheckinModule: (data: { course_id: string; template_typ: string; title?: string; week_index?: number }) =>
+    request<{ module_id: string; lesson_id: string }>('/checkin/modules', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getCheckinLesson: (lessonId: string) =>
+    request<CheckinLesson>(`/checkin/lessons/${lessonId}`),
+  updateCheckinLesson: (lessonId: string, data: {
+    title?: string;
+    week_index?: number;
+    step_overrides?: Record<string, { frage?: string; optionen?: string[] }>;
+  }) =>
+    request<{ id: string }>(`/checkin/lessons/${lessonId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
   // Integrations (service tokens)
   listServiceTokens: () =>
     request<ServiceTokenInfo[]>('/integrations/tokens'),
@@ -347,6 +367,7 @@ export interface LessonItem {
   duration_minutes: number;
   sort_order: number;
   completed: boolean;
+  type: 'video' | 'checkin';
 }
 
 export interface SectionItem {
@@ -369,6 +390,43 @@ export interface ModuleItem {
   total_lessons: number;
   completed_lessons: number;
   total_duration: number;
+  is_checkin: boolean;
+  checkin_typ: 'start' | 'laufend' | 'ende' | null;
+  checkin_week_index: number | null;
+  checkin_lesson_id: string | null;
+  checkin_template_id: string | null;
+}
+
+export interface CheckinTemplateInfo {
+  id: string;
+  typ: 'start' | 'laufend' | 'ende';
+  name: string;
+}
+
+export interface CheckinStep {
+  key: string;
+  typ: 'intro' | 'skala' | 'einfachauswahl' | 'mehrfachauswahl' | 'kurztext' | 'langtext' | 'bestaetigung';
+  frage: string | null;
+  hilfetext: string | null;
+  pflichtfeld: boolean;
+  optionen: string[] | null;
+  skala_min: number | null;
+  skala_max: number | null;
+  skala_labels: { min?: string; max?: string } | null;
+  sort_order: number;
+  overridden: boolean;
+}
+
+export interface CheckinLesson {
+  lesson_id: string;
+  module_id: string;
+  course_id: string;
+  title: string;
+  template_id: string;
+  template_typ: 'start' | 'laufend' | 'ende';
+  template_name: string;
+  week_index: number | null;
+  steps: CheckinStep[];
 }
 
 export interface CourseDetail {

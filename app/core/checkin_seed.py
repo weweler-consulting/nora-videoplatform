@@ -9,7 +9,7 @@ import uuid
 
 from sqlalchemy import select
 
-from app.core.db import async_session
+from app.core import db as db_module
 from app.models.checkin import CheckinTemplate, CheckinStep
 
 logger = logging.getLogger(__name__)
@@ -86,7 +86,9 @@ TEMPLATES: dict[str, tuple[str, list[dict]]] = {
 
 
 async def seed_checkin_templates() -> None:
-    async with async_session() as db:
+    # Über das Modul auflösen (nicht beim Import binden), damit Tests die
+    # gepatchte async_session/Engine treffen.
+    async with db_module.async_session() as db:
         created = 0
         for typ, (name, steps) in TEMPLATES.items():
             existing = await db.execute(

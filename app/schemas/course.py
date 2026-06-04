@@ -34,6 +34,7 @@ class LessonOut(BaseModel):
     duration_minutes: int
     sort_order: int
     completed: bool = False
+    type: str = "video"  # 'video' | 'checkin'
 
 
 class SectionOut(BaseModel):
@@ -56,6 +57,12 @@ class ModuleOut(BaseModel):
     total_lessons: int = 0
     completed_lessons: int = 0
     total_duration: int = 0
+    # Abgeleitet: Modul enthält eine 'checkin'-Lektion → Badge + Edit-Routing
+    is_checkin: bool = False
+    checkin_typ: Optional[str] = None  # 'start' | 'laufend' | 'ende'
+    checkin_week_index: Optional[int] = None
+    checkin_lesson_id: Optional[str] = None
+    checkin_template_id: Optional[str] = None
 
 
 class CourseOut(BaseModel):

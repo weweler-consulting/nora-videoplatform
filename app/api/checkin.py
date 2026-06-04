@@ -1,0 +1,186 @@
+"""Admin-API für Check-In-Formulare.
+
+Ein Check-in = ein Modul (Container) mit genau einer Lektion vom Typ 'checkin',
+die auf ein editierbares Template zeigt. So erscheint der Check-in als Eintrag
+in der Modulliste, rendert im Lektions-Player-Frame und zählt über LessonProgress
+in den Fortschritt (Phase 3).
+"""
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.db import get_db
+from app.core.auth import get_current_user, require_admin
+from app.models.user import User
+from app.models.course import Course, Module, Section, Lesson
+from app.models.checkin import CheckinTemplate, CheckinStep
+from app.schemas.checkin import (
+    CheckinTemplateOut, CheckinStepOut, CheckinLessonOut,
+    CheckinModuleCreate, CheckinLessonUpdate,
+)
+
+router = APIRouter()
+
+_DEFAULT_TITLE = {
+    "start": "Check-in: Bestandsaufnahme",
+    "laufend": "Wöchentlicher Check-in",
+    "ende": "Abschluss-Check-in",
+}
+
+
+async def _resolve_template(db: AsyncSession, typ: str) -> CheckinTemplate:
+    result = await db.execute(
+        select(CheckinTemplate).where(CheckinTemplate.typ == typ)
+        .order_by(CheckinTemplate.created_at.desc())
+    )
+    template = result.scalars().first()
+    if not template:
+        raise HTTPException(status_code=404, detail=f"Kein Check-In-Template für typ '{typ}'")
+    return template
+
+
+async def _load_checkin_lesson(db: AsyncSession, lesson_id: str) -> tuple[Lesson, Section, Module]:
+    lesson = (await db.execute(select(Lesson).where(Lesson.id == lesson_id))).scalar_one_or_none()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="Lektion nicht gefunden")
+    if lesson.type != "checkin":
+        raise HTTPException(status_code=400, detail="Lektion ist kein Check-in")
+    section = (await db.execute(select(Section).where(Section.id == lesson.section_id))).scalar_one_or_none()
+    module = (
+        (await db.execute(select(Module).where(Module.id == section.module_id))).scalar_one_or_none()
+        if section else None
+    )
+    return lesson, section, module
+
+
+def _merge_steps(template_steps: list[CheckinStep], overrides: dict) -> list[CheckinStepOut]:
+    step_overrides = (overrides or {}).get("steps", {}) or {}
+    out: list[CheckinStepOut] = []
+    for s in template_steps:
+        ov = step_overrides.get(s.key, {}) or {}
+        is_overridden = bool(ov.get("frage") is not None or ov.get("optionen") is not None)
+        out.append(CheckinStepOut(
+            key=s.key, typ=s.typ,
+            frage=ov.get("frage") if ov.get("frage") is not None else s.frage,
+            hilfetext=s.hilfetext,
+            pflichtfeld=s.pflichtfeld,
+            optionen=ov.get("optionen") if ov.get("optionen") is not None else s.optionen,
+            skala_min=s.skala_min, skala_max=s.skala_max, skala_labels=s.skala_labels,
+            sort_order=s.sort_order, overridden=is_overridden,
+        ))
+    return out
+
+
+@router.get("/templates", response_model=list[CheckinTemplateOut])
+async def list_templates(admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(CheckinTemplate).order_by(CheckinTemplate.typ))
+    return [CheckinTemplateOut(id=t.id, typ=t.typ, name=t.name) for t in result.scalars().all()]
+
+
+@router.post("/modules", response_model=dict)
+async def create_checkin_module(
+    data: CheckinModuleCreate, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)
+):
+    course = (await db.execute(select(Course).where(Course.id == data.course_id))).scalar_one_or_none()
+    if not course:
+        raise HTTPException(status_code=404, detail="Kurs nicht gefunden")
+    template = await _resolve_template(db, data.template_typ)
+
+    title = (data.title or "").strip() or _DEFAULT_TITLE.get(data.template_typ, "Check-in")
+    if data.week_index and not data.title:
+        title = f"Check-in Woche {data.week_index}"
+
+    # Ans Ende der Modulliste; gleiche sort_order-Semantik wie beim Video-Modul.
+    existing = (await db.execute(
+        select(Module.id).where(Module.course_id == course.id)
+    )).scalars().all()
+    sort_order = len(existing)
+
+    module = Module(course_id=course.id, title=title, sort_order=sort_order)
+    db.add(module)
+    await db.flush()
+    section = Section(module_id=module.id, title="Check-In", sort_order=0)
+    db.add(section)
+    await db.flush()
+
+    overrides: dict = {}
+    if data.week_index is not None:
+        overrides["week_index"] = data.week_index
+    lesson = Lesson(
+        section_id=section.id, title=title, sort_order=0,
+        type="checkin", checkin_template_id=template.id, checkin_overrides=overrides,
+    )
+    db.add(lesson)
+    await db.flush()
+    return {"module_id": module.id, "lesson_id": lesson.id}
+
+
+@router.get("/lessons/{lesson_id}", response_model=CheckinLessonOut)
+async def get_checkin_lesson(
+    lesson_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    lesson, section, module = await _load_checkin_lesson(db, lesson_id)
+    template = (
+        await db.execute(
+            select(CheckinTemplate).where(CheckinTemplate.id == lesson.checkin_template_id)
+        )
+    ).scalar_one_or_none()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template nicht gefunden")
+    steps = (await db.execute(
+        select(CheckinStep).where(CheckinStep.template_id == template.id).order_by(CheckinStep.sort_order)
+    )).scalars().all()
+    overrides = lesson.checkin_overrides or {}
+    return CheckinLessonOut(
+        lesson_id=lesson.id,
+        module_id=module.id if module else "",
+        course_id=module.course_id if module else "",
+        title=lesson.title,
+        template_id=template.id,
+        template_typ=template.typ,
+        template_name=template.name,
+        week_index=overrides.get("week_index"),
+        steps=_merge_steps(steps, overrides),
+    )
+
+
+@router.put("/lessons/{lesson_id}", response_model=dict)
+async def update_checkin_lesson(
+    lesson_id: str, data: CheckinLessonUpdate,
+    admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)
+):
+    lesson, section, module = await _load_checkin_lesson(db, lesson_id)
+
+    if data.title is not None:
+        title = data.title.strip()
+        if title:
+            lesson.title = title
+            if module:  # Modul-Titel mitziehen → Modulliste zeigt denselben Namen
+                module.title = title
+
+    # checkin_overrides als neues dict zuweisen, damit SQLAlchemy die Änderung
+    # erkennt (JSON-Spalte ohne MutableDict trackt In-Place-Mutationen nicht).
+    overrides = dict(lesson.checkin_overrides or {})
+    if data.week_index is not None:
+        overrides["week_index"] = data.week_index
+    if data.step_overrides is not None:
+        steps = dict(overrides.get("steps", {}))
+        for key, ov in data.step_overrides.items():
+            cur = dict(steps.get(key, {}))
+            if ov.frage is not None:
+                cur["frage"] = ov.frage
+            if ov.optionen is not None:
+                cur["optionen"] = ov.optionen
+            # Leerer String / leere Liste = Override entfernen (zurück zum Standard)
+            if cur.get("frage") == "":
+                cur.pop("frage", None)
+            if cur.get("optionen") == []:
+                cur.pop("optionen", None)
+            if cur:
+                steps[key] = cur
+            else:
+                steps.pop(key, None)
+        overrides["steps"] = steps
+    lesson.checkin_overrides = overrides
+
+    return {"id": lesson.id}

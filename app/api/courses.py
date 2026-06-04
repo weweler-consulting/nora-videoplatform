@@ -10,6 +10,7 @@ from app.core.auth import get_current_user, require_admin, require_admin_or_serv
 from app.core.time import utc_now
 from app.models.user import User
 from app.models.course import Course, Module, Section, Lesson, Enrollment, LessonProgress, ModuleUnlock
+from app.models.checkin import CheckinTemplate
 from app.models.hub import CourseHub
 from app.schemas.course import (
     CourseCreate, CourseUpdate, CourseOut, CourseListItem, ModuleOut, SectionOut, LessonOut,
@@ -27,7 +28,23 @@ async def _get_user_progress(db: AsyncSession, user_id: str) -> set[str]:
     return set(result.scalars().all())
 
 
-def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: datetime | None = None, unlocked_module_ids: set[str] | None = None) -> CourseOut:
+async def _checkin_typ_map(db: AsyncSession, course: Course) -> dict[str, str]:
+    """template_id -> typ für alle Check-in-Lektionen des Kurses (für Badge/Routing)."""
+    ids = {
+        l.checkin_template_id
+        for m in course.modules for s in m.sections for l in s.lessons
+        if l.type == "checkin" and l.checkin_template_id
+    }
+    if not ids:
+        return {}
+    result = await db.execute(
+        select(CheckinTemplate.id, CheckinTemplate.typ).where(CheckinTemplate.id.in_(ids))
+    )
+    return {row[0]: row[1] for row in result.all()}
+
+
+def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: datetime | None = None, unlocked_module_ids: set[str] | None = None, checkin_typ_by_template_id: dict[str, str] | None = None) -> CourseOut:
+    checkin_typ_by_template_id = checkin_typ_by_template_id or {}
     modules_out = []
     total_lessons = 0
     total_completed = 0
@@ -48,17 +65,22 @@ def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: date
         mod_lessons = 0
         mod_completed = 0
         mod_duration = 0
+        checkin_lesson = None
 
         for section in module.sections:
             lessons_out = []
             for lesson in section.lessons:
                 is_done = lesson.id in completed_ids
+                lesson_type = getattr(lesson, "type", "video") or "video"
+                if lesson_type == "checkin" and checkin_lesson is None:
+                    checkin_lesson = lesson
                 lessons_out.append(LessonOut(
                     id=lesson.id, title=lesson.title,
                     description=None if is_locked else lesson.description,
                     video_url=None if is_locked else lesson.video_url,
                     duration_minutes=lesson.duration_minutes,
                     sort_order=lesson.sort_order, completed=is_done,
+                    type=lesson_type,
                 ))
                 mod_lessons += 1
                 mod_duration += lesson.duration_minutes
@@ -70,6 +92,7 @@ def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: date
 
         total_lessons += mod_lessons
         total_completed += mod_completed
+        checkin_overrides = (checkin_lesson.checkin_overrides or {}) if checkin_lesson else {}
         modules_out.append(ModuleOut(
             id=module.id, title=module.title, description=module.description,
             image_url=module.image_url, sort_order=module.sort_order,
@@ -77,6 +100,11 @@ def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: date
             is_locked=is_locked, unlocks_at=unlocks_at,
             sections=sections_out, total_lessons=mod_lessons,
             completed_lessons=mod_completed, total_duration=mod_duration,
+            is_checkin=checkin_lesson is not None,
+            checkin_typ=checkin_typ_by_template_id.get(checkin_lesson.checkin_template_id) if checkin_lesson else None,
+            checkin_week_index=checkin_overrides.get("week_index") if checkin_lesson else None,
+            checkin_lesson_id=checkin_lesson.id if checkin_lesson else None,
+            checkin_template_id=checkin_lesson.checkin_template_id if checkin_lesson else None,
         ))
 
     progress = int((total_completed / total_lessons * 100) if total_lessons > 0 else 0)
@@ -142,16 +170,17 @@ async def get_course(course_id: str, user: User = Depends(get_current_user), db:
         raise HTTPException(status_code=404, detail="Course not found")
 
     completed_ids = await _get_user_progress(db, user.id)
+    checkin_map = await _checkin_typ_map(db, course)
     # Admin sees everything unlocked
     if user.is_admin:
-        return _build_course_out(course, completed_ids)
+        return _build_course_out(course, completed_ids, checkin_typ_by_template_id=checkin_map)
 
     # Load manual unlocks for this user
     unlocks_result = await db.execute(
         select(ModuleUnlock.module_id).where(ModuleUnlock.user_id == user.id)
     )
     unlocked_module_ids = set(unlocks_result.scalars().all())
-    return _build_course_out(course, completed_ids, enrolled_at=enrollment.enrolled_at, unlocked_module_ids=unlocked_module_ids)
+    return _build_course_out(course, completed_ids, enrolled_at=enrollment.enrolled_at, unlocked_module_ids=unlocked_module_ids, checkin_typ_by_template_id=checkin_map)
 
 
 # Admin endpoints
@@ -220,4 +249,5 @@ async def admin_get_course(course_id: str, admin: User = Depends(require_admin),
     course = result.scalar_one_or_none()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
-    return _build_course_out(course, set())
+    checkin_map = await _checkin_typ_map(db, course)
+    return _build_course_out(course, set(), checkin_typ_by_template_id=checkin_map)
