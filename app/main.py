@@ -18,6 +18,8 @@ from app.core.drip_notifier import drip_notifier_loop
 from app.core.ratelimit import limiter
 from app.api import auth, courses, hub, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook, attachments, integrations, admin_hub, announcements
 from app.models import hub as _hub_models  # noqa: F401 — register Hub tables with Base
+from app.models import checkin as _checkin_models  # noqa: F401 — register Check-In tables with Base
+from app.core.checkin_seed import seed_checkin_templates
 from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
@@ -56,6 +58,11 @@ def _build_migration_statements() -> list[str]:
         "ALTER TABLE modules ADD COLUMN unlock_after_days INTEGER DEFAULT 0 NOT NULL",
         "ALTER TABLE courses ADD COLUMN stripe_product_id VARCHAR",
         "ALTER TABLE courses ADD COLUMN hub_enabled BOOLEAN DEFAULT TRUE NOT NULL",
+        # Check-In: Lektions-Discriminator + Template-Verweis (additiv, bestehende
+        # Lektionen werden automatisch type='video').
+        "ALTER TABLE lessons ADD COLUMN type VARCHAR DEFAULT 'video' NOT NULL",
+        "ALTER TABLE lessons ADD COLUMN checkin_template_id VARCHAR",
+        "ALTER TABLE lessons ADD COLUMN checkin_overrides JSON",
     ]
     # Re-create FK constraints with ON DELETE CASCADE (A3 from audit)
     for child, col, parent in _FK_CASCADES:
@@ -182,6 +189,11 @@ async def lifespan(app: FastAPI):
         await _seed_bundle_mappings()
     except Exception as e:
         logger.warning(f"Bundle mapping seed failed: {e}")
+    # Seed: die zwei Check-In-Templates (start, laufend) — idempotent, editierbar
+    try:
+        await seed_checkin_templates()
+    except Exception as e:
+        logger.warning(f"Check-in template seed failed: {e}")
     task = asyncio.create_task(drip_notifier_loop())
     yield
     task.cancel()

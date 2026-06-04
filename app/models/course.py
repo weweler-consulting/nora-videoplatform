@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Text, Boolean, UniqueConstraint
+from sqlalchemy import String, Integer, DateTime, ForeignKey, Text, Boolean, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -65,6 +65,13 @@ class Lesson(Base):
     video_url: Mapped[str] = mapped_column(String, nullable=True)
     duration_minutes: Mapped[int] = mapped_column(Integer, default=0)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    # Discriminator: 'video' (Default, bestehende Lektionen) | 'checkin'
+    type: Mapped[str] = mapped_column(String, default="video", server_default="video", nullable=False)
+    # Nur bei type='checkin': genutztes Template + instanz-eigene Overrides
+    # (z. B. die wechselnde Wochenfrage 'umsetzung'). Loser Verweis ohne DB-FK,
+    # analog Announcement.target_id — hält additive Live-Migration einfach.
+    checkin_template_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    checkin_overrides: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     section = relationship("Section", back_populates="lessons")
