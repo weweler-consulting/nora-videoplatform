@@ -140,3 +140,26 @@ async def approve_link(import_id: str, token: str, db: AsyncSession = Depends(ge
         return HTMLResponse(_page("Import nicht gefunden."), status_code=404)
     await _approve(db, imp)
     return HTMLResponse(_page("Freigegeben & angekündigt ✅ — die Lektion ist jetzt sichtbar."))
+
+
+async def _dismiss(db, imp: LiveCallImport) -> None:
+    if imp.status == "dismissed":
+        return
+    lesson = (await db.execute(select(Lesson).where(Lesson.id == imp.lesson_id))).scalar_one_or_none() if imp.lesson_id else None
+    if lesson is not None:
+        if lesson.video_url:
+            delete_video_by_embed_url(lesson.video_url)
+        await db.delete(lesson)
+    imp.status = "dismissed"
+    await db.commit()
+
+
+@router.get("/dismiss", response_class=HTMLResponse)
+async def dismiss_link(import_id: str, token: str, db: AsyncSession = Depends(get_db)):
+    if verify_action_token(token, "dismiss") != import_id:
+        return HTMLResponse(_page("Ungültiger oder abgelaufener Link."), status_code=400)
+    imp = (await db.execute(select(LiveCallImport).where(LiveCallImport.id == import_id))).scalar_one_or_none()
+    if not imp:
+        return HTMLResponse(_page("Import nicht gefunden."), status_code=404)
+    await _dismiss(db, imp)
+    return HTMLResponse(_page("Verworfen ✅ — Lektion und Video wurden entfernt."))
