@@ -7,9 +7,10 @@ video-platform); Retry über crm_outbox.retry_count.
 """
 import asyncio
 import logging
+from datetime import timedelta
 
 import httpx
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 
 from app.core import db as db_module
 from app.core.config import settings
@@ -21,6 +22,10 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 10
 BATCH_SIZE = 25
 INTERVAL_SECONDS = 60
+# Gesyncte Outbox-Zeilen nach dieser Frist löschen (Daten liegen dann im CRM +
+# in checkin_responses → redundant). Geparkte Fehlversuche bleiben unberührt.
+OUTBOX_RETENTION_DAYS = 30
+_PRUNE_EVERY_N_CYCLES = max(1, 3600 // INTERVAL_SECONDS)  # ~stündlich
 _warned_unconfigured = False
 
 
@@ -96,11 +101,35 @@ async def process_crm_outbox() -> int:
         return synced
 
 
+async def prune_crm_outbox(retention_days: int = OUTBOX_RETENTION_DAYS) -> int:
+    """Löscht erfolgreich gesyncte Outbox-Zeilen, die älter als retention_days
+    sind — die Daten liegen dann im CRM UND in checkin_responses, die Zeile ist
+    redundant (und hält PII vor). GEPARKTE Fehlversuche (synced_at IS NULL)
+    bleiben: sie signalisieren nicht zugestellte Daten und sollen sichtbar sein."""
+    cutoff = utc_now() - timedelta(days=retention_days)
+    async with db_module.async_session() as db:
+        result = await db.execute(
+            delete(CrmOutbox).where(
+                CrmOutbox.synced_at.is_not(None),
+                CrmOutbox.synced_at < cutoff,
+            )
+        )
+        await db.commit()
+        deleted = result.rowcount or 0
+        if deleted:
+            logger.info(f"CRM-Outbox-Prune: {deleted} gesyncte Zeile(n) älter als {retention_days}d gelöscht")
+        return deleted
+
+
 async def crm_sync_loop():
-    """Outbox alle INTERVAL_SECONDS abarbeiten."""
+    """Outbox alle INTERVAL_SECONDS abarbeiten; ~stündlich gesyncte Altzeilen prunen."""
+    cycle = 0
     while True:
         try:
             await process_crm_outbox()
+            if cycle % _PRUNE_EVERY_N_CYCLES == 0:
+                await prune_crm_outbox()
         except Exception as e:
             logger.error(f"CRM-Sync-Loop-Fehler: {e}", exc_info=True)
+        cycle += 1
         await asyncio.sleep(INTERVAL_SECONDS)

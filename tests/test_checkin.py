@@ -1,7 +1,11 @@
 import uuid
+from datetime import timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.crm_sync import prune_crm_outbox
+from app.core.time import utc_now
 
 from app.core.auth import create_access_token, hash_password
 from app.core.checkin_seed import (
@@ -739,3 +743,28 @@ async def test_migrate_laufend_heisshunger_key_renames_everywhere(client, sessio
     # Idempotent: zweiter Lauf ändert nichts mehr
     await migrate_laufend_step_keys()
     assert await _laufend_step_keys() == keys
+
+
+@pytest.mark.asyncio
+async def test_prune_crm_outbox_deletes_only_old_synced(client, session):
+    """Pruning entfernt nur gesyncte Zeilen älter als die Retention; frische
+    gesyncte UND geparkte (nie gesyncte) Zeilen bleiben erhalten."""
+    now = utc_now()
+    old_synced = CrmOutbox(event_type="checkin_response", payload={"x": 1},
+                           created_at=now - timedelta(days=40), synced_at=now - timedelta(days=40))
+    recent_synced = CrmOutbox(event_type="checkin_response", payload={"x": 2},
+                              created_at=now - timedelta(days=2), synced_at=now - timedelta(days=2))
+    old_parked = CrmOutbox(event_type="checkin_response", payload={"x": 3},
+                           created_at=now - timedelta(days=40), synced_at=None, retry_count=10)
+    session.add_all([old_synced, recent_synced, old_parked])
+    await session.commit()
+
+    deleted = await prune_crm_outbox(retention_days=30)
+    assert deleted == 1
+
+    session.expire_all()
+    remaining = {r.payload["x"] for r in (await session.execute(_select(CrmOutbox))).scalars()}
+    assert remaining == {2, 3}  # recent-synced + geparkt bleiben, alt-synced weg
+
+    # Idempotent: zweiter Lauf löscht nichts mehr
+    assert await prune_crm_outbox(retention_days=30) == 0
