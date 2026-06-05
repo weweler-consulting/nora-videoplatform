@@ -284,7 +284,7 @@ async def submit_checkin(
 
     # Tatsächlich gestellte Fragen (mit Overrides) für die CRM-Anzeige.
     questions = [
-        {"key": s.key, "frage": s.frage, "typ": s.typ, "skala_max": s.skala_max}
+        {"key": s.key, "frage": s.frage, "typ": s.typ, "skala_max": s.skala_max, "optionen": s.optionen}
         for s in _merge_steps(steps, overrides)
         if s.typ not in _NON_ANSWER_TYPES
     ]

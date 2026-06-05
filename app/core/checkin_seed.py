@@ -10,7 +10,7 @@ import uuid
 from sqlalchemy import select
 
 from app.core import db as db_module
-from app.models.checkin import CheckinTemplate, CheckinStep
+from app.models.checkin import CheckinTemplate, CheckinStep, CheckinResponse
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,11 @@ TEMPLATES: dict[str, tuple[str, list[dict]]] = {
              "frage": "Wie war deine Energie?",
              "skala_min": 1, "skala_max": 10,
              "skala_labels": {"min": "sehr niedrig", "max": "sehr hoch"}},
-            {"key": "heisshunger", "typ": "einfachauswahl", "pflichtfeld": True,
+            # Eigener Key (NICHT 'heisshunger'): start/ende fragen Heißhunger
+            # absolut ab (täglich…nie, key 'heisshunger'), laufend fragt RELATIV
+            # (weniger/gleich/mehr). Unterschiedliche Semantik -> eindeutiger Key,
+            # sonst kollidieren die Werte in template-übergreifenden Auswertungen.
+            {"key": "heisshunger_trend", "typ": "einfachauswahl", "pflichtfeld": True,
              "frage": "Heißhunger im Vergleich zu sonst?",
              "optionen": ["weniger", "gleich", "mehr"]},
             # Pro-Instanz editierbare Umsetzungsfrage. Default = Woche-1-Text;
@@ -188,3 +192,66 @@ async def sync_checkin_default_texts() -> None:
         if updated:
             await db.commit()
             logger.info(f"Updated {updated} check-in default text(s)")
+
+
+# Eindeutige Umbenennung mehrdeutiger 'laufend'-Step-Keys. Hintergrund: 'start'
+# und 'ende' fragen Heißhunger ABSOLUT ab (täglich…nie, key 'heisshunger'),
+# 'laufend' fragte denselben Key RELATIV (weniger/gleich/mehr). Gleicher Key,
+# zwei Vokabulare -> Kollision in template-übergreifenden Auswertungen. Wir
+# benennen den laufend-Key um und ziehen Template-Step, historische Antworten und
+# Lesson-Overrides mit. (alter Key, neuer Key)
+_LAUFEND_KEY_RENAMES: list[tuple[str, str]] = [
+    ("heisshunger", "heisshunger_trend"),
+]
+
+
+async def migrate_laufend_step_keys() -> None:
+    """Benennt mehrdeutige 'laufend'-Step-Keys eindeutig um. Migriert Template-
+    Step, historische CheckinResponse.answers und Lesson-Overrides mit. Fasst nur
+    den jeweils ALTEN Key an -> idempotent, Re-Run = No-op."""
+    from app.models.course import Lesson  # lazy: vermeidet Import-Zyklus
+
+    async with db_module.async_session() as db:
+        tmpl_ids = (await db.execute(
+            select(CheckinTemplate.id).where(CheckinTemplate.typ == "laufend")
+        )).scalars().all()
+        if not tmpl_ids:
+            return
+
+        changed = 0
+        for old, new in _LAUFEND_KEY_RENAMES:
+            # 1. Template-Step(s)
+            for step in (await db.execute(
+                select(CheckinStep).where(
+                    CheckinStep.template_id.in_(tmpl_ids), CheckinStep.key == old
+                )
+            )).scalars():
+                step.key = new
+                changed += 1
+
+            # 2. Historische Antworten (nur laufend) — answers neu zuweisen, damit
+            #    SQLAlchemy die JSON-Änderung erkennt.
+            for resp in (await db.execute(
+                select(CheckinResponse).where(CheckinResponse.template_typ == "laufend")
+            )).scalars():
+                if isinstance(resp.answers, dict) and old in resp.answers:
+                    a = dict(resp.answers)
+                    a[new] = a.pop(old)
+                    resp.answers = a
+                    changed += 1
+
+            # 3. Lesson-Overrides der laufend-Lektionen (steps.<key>)
+            for lesson in (await db.execute(
+                select(Lesson).where(Lesson.checkin_template_id.in_(tmpl_ids))
+            )).scalars():
+                ov = lesson.checkin_overrides
+                steps_ov = ov.get("steps") if isinstance(ov, dict) else None
+                if isinstance(steps_ov, dict) and old in steps_ov:
+                    new_steps = dict(steps_ov)
+                    new_steps[new] = new_steps.pop(old)
+                    lesson.checkin_overrides = {**ov, "steps": new_steps}
+                    changed += 1
+
+        if changed:
+            await db.commit()
+            logger.info(f"Renamed {changed} laufend step-key occurrence(s)")

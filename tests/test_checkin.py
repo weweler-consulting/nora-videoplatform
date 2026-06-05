@@ -4,7 +4,11 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import create_access_token, hash_password
-from app.core.checkin_seed import seed_checkin_templates, sync_checkin_default_texts
+from app.core.checkin_seed import (
+    seed_checkin_templates,
+    sync_checkin_default_texts,
+    migrate_laufend_step_keys,
+)
 from app.models.checkin import CheckinTemplate, CheckinStep
 from app.models.course import Course, Module, Section, Lesson, Enrollment, LessonProgress
 from app.models.checkin import CheckinResponse, CrmOutbox
@@ -139,7 +143,7 @@ async def test_get_and_override_checkin_lesson(client, session):
     assert umsetzung["overridden"] is False
     # Stabile Kern-Keys vorhanden
     keys = {s["key"] for s in data["steps"]}
-    assert {"wohlbefinden", "energie", "heisshunger", "umsetzung"} <= keys
+    assert {"wohlbefinden", "energie", "heisshunger_trend", "umsetzung"} <= keys
 
     # Override der Wochenfrage + week_index ändern
     r2 = await client.put(
@@ -220,7 +224,7 @@ async def test_submit_checkin_marks_complete_and_persists(client, session):
     assert rbad.status_code == 422
 
     # Vollständig -> 200
-    answers = {"wohlbefinden": 8, "energie": 7, "heisshunger": "weniger",
+    answers = {"wohlbefinden": 8, "energie": 7, "heisshunger_trend": "weniger",
                "umsetzung": "5 Tage", "win": "mehr Energie", "huerde": "Wochenende"}
     rok = await client.post(
         f"/api/v1/checkin/lessons/{lesson_id}/submit", headers=_auth(klientin),
@@ -281,7 +285,7 @@ async def test_edit_resubmit_updates_and_resets_sync(client, session):
     klientin = await _mk_user(session, admin=False)
     await _enroll(session, klientin.id, course.id)
 
-    base = {"wohlbefinden": 5, "energie": 5, "heisshunger": "gleich"}
+    base = {"wohlbefinden": 5, "energie": 5, "heisshunger_trend": "gleich"}
     await client.post(f"/api/v1/checkin/lessons/{lesson_id}/submit", headers=_auth(klientin),
                       json={"answers": base})
     # Sync simulieren
@@ -312,7 +316,7 @@ async def test_submit_enqueues_crm_outbox(client, session):
     await _enroll(session, klientin.id, course.id)
 
     await client.post(f"/api/v1/checkin/lessons/{lesson_id}/submit", headers=_auth(klientin),
-                      json={"answers": {"wohlbefinden": 6, "energie": 6, "heisshunger": "gleich"}})
+                      json={"answers": {"wohlbefinden": 6, "energie": 6, "heisshunger_trend": "gleich"}})
 
     rows = (await session.execute(_select(CrmOutbox))).scalars().all()
     assert len(rows) == 1
@@ -459,7 +463,7 @@ async def test_submit_rejects_unknown_keys_and_oversized(client, session):
     klientin = await _mk_user(session, admin=False)
     await _enroll(session, klientin.id, course.id)
 
-    base = {"wohlbefinden": 7, "energie": 7, "heisshunger": "gleich"}
+    base = {"wohlbefinden": 7, "energie": 7, "heisshunger_trend": "gleich"}
     r = await client.post(f"/api/v1/checkin/lessons/{lesson_id}/submit", headers=_auth(klientin),
                           json={"answers": {**base, "boeser_key": "x"}})
     assert r.status_code == 422
@@ -574,18 +578,24 @@ async def test_submit_includes_ordered_questions_in_outbox(client, session):
     klientin = await _mk_user(session, admin=False)
     await _enroll(session, klientin.id, course.id)
     await client.post(f"/api/v1/checkin/lessons/{lesson_id}/submit", headers=_auth(klientin),
-                      json={"answers": {"wohlbefinden": 8, "energie": 6, "heisshunger": "gleich"}})
+                      json={"answers": {"wohlbefinden": 8, "energie": 6, "heisshunger_trend": "gleich"}})
 
     row = (await session.execute(_select(CrmOutbox).order_by(CrmOutbox.created_at.desc()))).scalars().first()
     questions = row.payload["questions"]
     typen = [q["typ"] for q in questions]
     assert "intro" not in typen and "bestaetigung" not in typen
     keys = [q["key"] for q in questions]
-    assert keys[:3] == ["wohlbefinden", "energie", "heisshunger"]
+    assert keys[:3] == ["wohlbefinden", "energie", "heisshunger_trend"]
     wohl = next(q for q in questions if q["key"] == "wohlbefinden")
     assert wohl["typ"] == "skala" and wohl["skala_max"] == 10
     ums = next(q for q in questions if q["key"] == "umsetzung")
     assert ums["frage"] == "Eigene Wochenfrage?"
+    # optionen wird mitgeschickt: Auswahl-Fragen tragen ihre Optionsliste,
+    # Skalen haben keine (None) — erlaubt dem CRM, Skalen zu unterscheiden.
+    assert all("optionen" in q for q in questions)
+    choice = next(q for q in questions if q["typ"] == "einfachauswahl")
+    assert isinstance(choice["optionen"], list) and len(choice["optionen"]) > 0
+    assert wohl["optionen"] is None
 
 
 @pytest.mark.asyncio
@@ -668,3 +678,64 @@ async def test_sync_default_texts_lifts_old_laufend_wording(client, session):
     await session.commit()
     await sync_checkin_default_texts()
     assert await _frage("win") == "Mein eigener Text"
+
+
+@pytest.mark.asyncio
+async def test_migrate_laufend_heisshunger_key_renames_everywhere(client, session):
+    """Eindeutiger laufend-Key: heisshunger -> heisshunger_trend zieht Template-
+    Step, historische Antworten und Lesson-Overrides mit; start bleibt unberührt."""
+    await seed_checkin_templates()
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    created = (await client.post(
+        "/api/v1/checkin/modules", headers=_auth(admin),
+        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1},
+    )).json()
+    lesson_id = created["lesson_id"]
+    klientin = await _mk_user(session, admin=False)
+
+    async def _laufend_step_keys() -> set:
+        session.expire_all()
+        rows = (await session.execute(_select(CheckinStep.key).join(
+            CheckinTemplate, CheckinStep.template_id == CheckinTemplate.id).where(
+            CheckinTemplate.typ == "laufend"))).scalars().all()
+        return set(rows)
+
+    # --- Alten DB-Zustand simulieren (vor der Umbenennung geseedet) ---
+    step = (await session.execute(_select(CheckinStep).join(
+        CheckinTemplate, CheckinStep.template_id == CheckinTemplate.id).where(
+        CheckinTemplate.typ == "laufend", CheckinStep.key == "heisshunger_trend"))).scalar_one()
+    step.key = "heisshunger"
+    lesson = (await session.execute(_select(Lesson).where(Lesson.id == lesson_id))).scalar_one()
+    lesson.checkin_overrides = {"week_index": 1, "steps": {"heisshunger": {"frage": "Custom?"}}}
+    session.add(CheckinResponse(
+        user_id=klientin.id, course_id=course.id, lesson_id=lesson_id,
+        template_typ="laufend", week_index=1,
+        answers={"wohlbefinden": 5, "heisshunger": "weniger"},
+    ))
+    await session.commit()
+    assert "heisshunger" in await _laufend_step_keys()
+
+    # --- Migration ---
+    await migrate_laufend_step_keys()
+
+    # Template-Step umbenannt
+    keys = await _laufend_step_keys()
+    assert "heisshunger_trend" in keys and "heisshunger" not in keys
+    # Historische Antwort umbenannt (verlustfrei)
+    resp = (await session.execute(_select(CheckinResponse).where(
+        CheckinResponse.lesson_id == lesson_id))).scalar_one()
+    assert resp.answers == {"wohlbefinden": 5, "heisshunger_trend": "weniger"}
+    # Lesson-Override umbenannt
+    lesson = (await session.execute(_select(Lesson).where(Lesson.id == lesson_id))).scalar_one()
+    assert "heisshunger_trend" in lesson.checkin_overrides["steps"]
+    assert "heisshunger" not in lesson.checkin_overrides["steps"]
+    # start bleibt absolut (key heisshunger) — NICHT angefasst
+    start_keys = (await session.execute(_select(CheckinStep.key).join(
+        CheckinTemplate, CheckinStep.template_id == CheckinTemplate.id).where(
+        CheckinTemplate.typ == "start"))).scalars().all()
+    assert "heisshunger" in set(start_keys)
+
+    # Idempotent: zweiter Lauf ändert nichts mehr
+    await migrate_laufend_step_keys()
+    assert await _laufend_step_keys() == keys

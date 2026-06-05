@@ -20,7 +20,7 @@ from app.core.ratelimit import limiter
 from app.api import auth, courses, hub, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook, attachments, integrations, admin_hub, announcements, checkin
 from app.models import hub as _hub_models  # noqa: F401 — register Hub tables with Base
 from app.models import checkin as _checkin_models  # noqa: F401 — register Check-In tables with Base
-from app.core.checkin_seed import seed_checkin_templates, sync_checkin_default_texts
+from app.core.checkin_seed import seed_checkin_templates, sync_checkin_default_texts, migrate_laufend_step_keys
 from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
@@ -195,6 +195,8 @@ async def lifespan(app: FastAPI):
         await seed_checkin_templates()
         # Default-Fragetexte bereits geseedeter Templates idempotent nachziehen
         await sync_checkin_default_texts()
+        # Mehrdeutige laufend-Step-Keys eindeutig umbenennen (idempotent)
+        await migrate_laufend_step_keys()
     except Exception as e:
         logger.warning(f"Check-in template seed failed: {e}")
     task = asyncio.create_task(drip_notifier_loop())
