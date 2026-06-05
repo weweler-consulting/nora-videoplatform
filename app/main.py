@@ -20,6 +20,7 @@ from app.core.ratelimit import limiter
 from app.api import auth, courses, hub, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook, attachments, integrations, admin_hub, announcements, checkin
 from app.models import hub as _hub_models  # noqa: F401 — register Hub tables with Base
 from app.models import checkin as _checkin_models  # noqa: F401 — register Check-In tables with Base
+from app.models import live_call as _live_call_models  # noqa: F401 — register Live-Call tables with Base
 from app.core.checkin_seed import seed_checkin_templates, sync_checkin_default_texts, migrate_laufend_step_keys
 from sqlalchemy import select
 
