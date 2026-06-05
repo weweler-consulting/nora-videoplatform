@@ -3,16 +3,17 @@
 Prefix-Vorschlag: leitet aus realen Drive-Namen den Teil VOR dem Datum ab und
 filtert bereits gemappte raus → im Admin anklickbar statt abtippen.
 """
+import asyncio
 import re
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Form
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.announcements import _enrolled_users, PLATFORM_BASE_URL
+from app.api.announcements import PLATFORM_BASE_URL
 from app.core.auth import require_admin
 from app.core.config import settings
 from app.core.db import get_db
@@ -21,7 +22,7 @@ from app.core.live_call_token import verify_action_token
 from app.core.time import utc_now
 from app.integrations.bunny_stream import delete_video_by_embed_url
 from app.integrations.google_drive import list_video_files
-from app.models.course import Lesson, Announcement
+from app.models.course import Lesson, Announcement, Enrollment, Section, Module
 from app.models.live_call import LiveCallSeries, LiveCallImport
 from app.models.user import User
 
@@ -92,15 +93,42 @@ async def suggest_prefixes(admin: User = Depends(require_admin), db: AsyncSessio
     return out
 
 
-# --- Freigabe-Flow (1-Klick aus der Mail, token-authentifiziert) ---
+# --- Freigabe-Flow: GET zeigt nur eine Bestätigungsseite, POST führt aus.
+# Gegen E-Mail-Prefetch (Gmail-Proxy, MS Safe Links, Link-Scanner): ein GET darf
+# NICHTS verändern, sonst könnte ein Scanner ungeklickt veröffentlichen/löschen.
 
 def _page(msg: str) -> str:
-    return (f"<!DOCTYPE html><html lang='de'><body style='font-family:Arial;text-align:center;"
-            f"padding:60px;color:#303030;'><h2>{msg}</h2></body></html>")
+    return (f"<!DOCTYPE html><html lang='de'><head><meta charset='utf-8'></head>"
+            f"<body style='font-family:Arial;text-align:center;padding:60px;color:#303030;'>"
+            f"<h2>{msg}</h2></body></html>")
+
+
+def _confirm_page(action_path: str, import_id: str, token: str, heading: str, button: str, hint: str) -> str:
+    return (f"<!DOCTYPE html><html lang='de'><head><meta charset='utf-8'></head>"
+            f"<body style='font-family:Arial;text-align:center;padding:60px;color:#303030;'>"
+            f"<h2>{heading}</h2><p style='color:#666;'>{hint}</p>"
+            f"<form method='post' action='{action_path}' style='margin-top:24px;'>"
+            f"<input type='hidden' name='import_id' value='{import_id}'>"
+            f"<input type='hidden' name='token' value='{token}'>"
+            f"<button type='submit' style='background:#D47479;color:#fff;border:0;font-weight:700;"
+            f"padding:12px 24px;border-radius:6px;font-size:15px;cursor:pointer;'>{button}</button>"
+            f"</form></body></html>")
+
+
+async def _enrolled_mailable(db, course_id: str) -> list[User]:
+    """Eingeschriebene, denen man wirklich mailen kann — aktiv, kein Admin, mit
+    Passwort (gleiche Gate wie der drip_notifier)."""
+    result = await db.execute(
+        select(User).join(Enrollment, Enrollment.user_id == User.id).where(
+            Enrollment.course_id == course_id,
+            User.is_active.is_(True), User.is_admin.is_(False), User.hashed_password != "",
+        )
+    )
+    return list(result.scalars().all())
 
 
 async def _send_lesson_announcement(db, course_id: str, lesson_id: str, subject: str, body: str) -> None:
-    enrolled = await _enrolled_users(db, course_id)
+    enrolled = await _enrolled_mailable(db, course_id)
     db.add(Announcement(course_id=course_id, target_type="lesson", target_id=lesson_id,
                         subject=subject, body=body, recipient_count=len(enrolled), created_by_user_id=None))
     cta_url = f"{PLATFORM_BASE_URL}/course/{course_id}/lesson/{lesson_id}"
@@ -112,10 +140,16 @@ async def _send_lesson_announcement(db, course_id: str, lesson_id: str, subject:
 
 
 async def _approve(db, imp: LiveCallImport) -> None:
-    if imp.status == "published":
-        return  # idempotent — keine zweite Ankündigung
-    if imp.status != "imported":
-        raise HTTPException(409, f"Import im Status '{imp.status}' nicht freigebbar")
+    # Atomar beanspruchen: nur wer 'imported'→'publishing' schafft, fährt fort.
+    # Verhindert Doppel-Ankündigung bei zwei gleichzeitigen Aufrufen (Doppelklick
+    # oder Scanner+Mensch) — der Mail-Fanout passiert nur einmal.
+    claim = await db.execute(
+        update(LiveCallImport)
+        .where(LiveCallImport.id == imp.id, LiveCallImport.status == "imported")
+        .values(status="publishing")
+    )
+    if (claim.rowcount or 0) == 0:
+        return  # nicht (mehr) freigebbar oder bereits in Arbeit/veröffentlicht
     series = (await db.execute(select(LiveCallSeries).where(LiveCallSeries.id == imp.series_id))).scalar_one()
     lesson = (await db.execute(select(Lesson).where(Lesson.id == imp.lesson_id))).scalar_one_or_none()
     if lesson is None:
@@ -126,13 +160,25 @@ async def _approve(db, imp: LiveCallImport) -> None:
     body = ("Hallo,\n\ndie Aufzeichnung unseres letzten Live-Calls ist jetzt für dich im Kurs verfügbar. "
             "Schau sie dir in Ruhe an – und nutze, was für dich passt.\n\nViel Freude damit!")
     await _send_lesson_announcement(db, series.course_id, imp.lesson_id, subject, body)
-    imp.status = "published"
-    imp.published_at = utc_now()
+    await db.execute(
+        update(LiveCallImport).where(LiveCallImport.id == imp.id).values(status="published", published_at=utc_now())
+    )
     await db.commit()
 
 
 @router.get("/approve", response_class=HTMLResponse)
-async def approve_link(import_id: str, token: str, db: AsyncSession = Depends(get_db)):
+async def approve_confirm(import_id: str, token: str):
+    if verify_action_token(token, "approve") != import_id:
+        return HTMLResponse(_page("Ungültiger oder abgelaufener Link."), status_code=400)
+    return HTMLResponse(_confirm_page(
+        "/api/v1/live-calls/approve", import_id, token,
+        "Live-Call freigeben?", "Ja, freigeben & ankündigen",
+        "Die Lektion wird sichtbar und die Kundinnen bekommen die Ankündigungs-Mail.",
+    ))
+
+
+@router.post("/approve", response_class=HTMLResponse)
+async def approve_action(import_id: str = Form(...), token: str = Form(...), db: AsyncSession = Depends(get_db)):
     if verify_action_token(token, "approve") != import_id:
         return HTMLResponse(_page("Ungültiger oder abgelaufener Link."), status_code=400)
     imp = (await db.execute(select(LiveCallImport).where(LiveCallImport.id == import_id))).scalar_one_or_none()
@@ -143,19 +189,44 @@ async def approve_link(import_id: str, token: str, db: AsyncSession = Depends(ge
 
 
 async def _dismiss(db, imp: LiveCallImport) -> None:
-    if imp.status == "dismissed":
-        return
+    if imp.status in ("dismissed", "published"):
+        return  # 'published' NICHT zerstören (Lektion ist live + angekündigt); 'dismissed' idempotent
     lesson = (await db.execute(select(Lesson).where(Lesson.id == imp.lesson_id))).scalar_one_or_none() if imp.lesson_id else None
     if lesson is not None:
         if lesson.video_url:
-            delete_video_by_embed_url(lesson.video_url)
+            await asyncio.to_thread(delete_video_by_embed_url, lesson.video_url)
         await db.delete(lesson)
+    # Auto-angelegtes, dann leeres 'Live Call <Datum>'-Modul mit aufräumen (NUR wenn
+    # WIR es angelegt haben — Platzhalter der Kursleiterin bleiben unangetastet).
+    if imp.module_created and imp.module_id:
+        remaining = (await db.execute(
+            select(func.count(Lesson.id)).join(Section, Lesson.section_id == Section.id)
+            .where(Section.module_id == imp.module_id)
+        )).scalar_one()
+        if remaining == 0:
+            mod = (await db.execute(select(Module).where(Module.id == imp.module_id))).scalar_one_or_none()
+            if mod is not None:
+                await db.delete(mod)  # cascade löscht die Section
     imp.status = "dismissed"
     await db.commit()
 
 
 @router.get("/dismiss", response_class=HTMLResponse)
-async def dismiss_link(import_id: str, token: str, db: AsyncSession = Depends(get_db)):
+async def dismiss_confirm(import_id: str, token: str, db: AsyncSession = Depends(get_db)):
+    if verify_action_token(token, "dismiss") != import_id:
+        return HTMLResponse(_page("Ungültiger oder abgelaufener Link."), status_code=400)
+    imp = (await db.execute(select(LiveCallImport).where(LiveCallImport.id == import_id))).scalar_one_or_none()
+    if imp and imp.status == "published":
+        return HTMLResponse(_page("Schon freigegeben — Verwerfen nicht möglich."))
+    return HTMLResponse(_confirm_page(
+        "/api/v1/live-calls/dismiss", import_id, token,
+        "Live-Call verwerfen?", "Ja, verwerfen",
+        "Die (versteckte) Lektion und das hochgeladene Video werden gelöscht.",
+    ))
+
+
+@router.post("/dismiss", response_class=HTMLResponse)
+async def dismiss_action(import_id: str = Form(...), token: str = Form(...), db: AsyncSession = Depends(get_db)):
     if verify_action_token(token, "dismiss") != import_id:
         return HTMLResponse(_page("Ungültiger oder abgelaufener Link."), status_code=400)
     imp = (await db.execute(select(LiveCallImport).where(LiveCallImport.id == import_id))).scalar_one_or_none()

@@ -31,7 +31,15 @@ async def test_approve_publishes_and_announces(client, session, monkeypatch):
     monkeypatch.setattr(lc, "send_announcement_email", lambda **k: sent.append(k.get("to_email")) or True)
 
     tok = create_action_token(imp.id, "approve")
-    r = await client.get(f"/api/v1/live-calls/approve?import_id={imp.id}&token={tok}")
+    # GET zeigt nur die Bestätigungsseite — darf NICHTS ändern (Anti-Prefetch).
+    g = await client.get(f"/api/v1/live-calls/approve?import_id={imp.id}&token={tok}")
+    assert g.status_code == 200
+    session.expunge_all()
+    assert (await session.execute(_select(Lesson).where(Lesson.id == lesson.id))).scalar_one().is_published is False
+    assert sent == []
+
+    # POST führt aus.
+    r = await client.post("/api/v1/live-calls/approve", data={"import_id": imp.id, "token": tok})
     assert r.status_code == 200
 
     session.expunge_all()
@@ -43,14 +51,31 @@ async def test_approve_publishes_and_announces(client, session, monkeypatch):
     ann = (await session.execute(_select(Announcement).where(Announcement.target_id == lesson.id))).scalar_one()
     assert ann.target_type == "lesson"
 
-    # Idempotent: erneut → keine zweite Ankündigung
+    # Idempotent: erneut POST → keine zweite Ankündigung
     sent.clear()
-    r2 = await client.get(f"/api/v1/live-calls/approve?import_id={imp.id}&token={tok}")
+    r2 = await client.post("/api/v1/live-calls/approve", data={"import_id": imp.id, "token": tok})
     assert r2.status_code == 200 and sent == []
 
 
 @pytest.mark.asyncio
 async def test_approve_bad_token(client, session):
     _course, _lesson, imp = await _imported(session)
-    r = await client.get(f"/api/v1/live-calls/approve?import_id={imp.id}&token=falsch")
+    r = await client.post("/api/v1/live-calls/approve", data={"import_id": imp.id, "token": "falsch"})
     assert r.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_announcement_only_to_mailable(client, session, monkeypatch):
+    """Inaktive, Admins und Nutzer ohne Passwort werden NICHT angeschrieben."""
+    course, lesson, imp = await _imported(session)
+    active = await _mk_user(session, admin=False); await _enroll(session, active.id, course.id)
+    admin = await _mk_user(session, admin=True); await _enroll(session, admin.id, course.id)
+    inactive = await _mk_user(session, admin=False); inactive.is_active = False
+    await session.commit(); await _enroll(session, inactive.id, course.id)
+    sent = []
+    monkeypatch.setattr(lc, "send_announcement_email", lambda **k: sent.append(k.get("to_email")) or True)
+
+    tok = create_action_token(imp.id, "approve")
+    r = await client.post("/api/v1/live-calls/approve", data={"import_id": imp.id, "token": tok})
+    assert r.status_code == 200
+    assert sent == [active.email]  # nur die aktive Klientin, nicht Admin/inaktiv
