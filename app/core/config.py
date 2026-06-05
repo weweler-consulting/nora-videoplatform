@@ -13,21 +13,24 @@ class Settings(BaseSettings):
     crm_webhook_url: Optional[str] = None        # NORA_CRM_WEBHOOK_URL
     crm_checkin_secret: Optional[str] = None     # NORA_CRM_CHECKIN_SECRET
 
-    # Google Drive (Live-Call-Import). Wenn nicht gesetzt, ist der Import-Loop
-    # ein No-op (kein Service-Account → nichts zu tun).
-    google_sa_json: Optional[str] = None             # NORA_GOOGLE_SA_JSON (JSON-String)
-    google_impersonate_subject: Optional[str] = None # NORA_GOOGLE_IMPERSONATE_SUBJECT
-    meet_recordings_folder_id: Optional[str] = None  # NORA_MEET_RECORDINGS_FOLDER_ID
+    # Google Drive (Live-Call-Import) via OAuth eines Workspace-internen Clients.
+    # Refresh-Token wird einmalig per scripts/google_oauth_setup.py geholt.
+    # Wenn nicht vollständig gesetzt, ist der Import-Loop ein No-op.
+    google_oauth_client_id: Optional[str] = None      # NORA_GOOGLE_OAUTH_CLIENT_ID
+    google_oauth_client_secret: Optional[str] = None  # NORA_GOOGLE_OAUTH_CLIENT_SECRET
+    google_oauth_refresh_token: Optional[str] = None  # NORA_GOOGLE_OAUTH_REFRESH_TOKEN
+    meet_recordings_folder_id: Optional[str] = None   # NORA_MEET_RECORDINGS_FOLDER_ID
 
     model_config = {"env_prefix": "NORA_"}
 
     @property
-    def google_sa_info(self) -> Optional[dict]:
-        """Geparster Service-Account-Key oder None, wenn nicht konfiguriert."""
-        import json
-        if not self.google_sa_json:
-            return None
-        return json.loads(self.google_sa_json)
+    def google_oauth_configured(self) -> bool:
+        """True, wenn Client-ID, Secret und Refresh-Token gesetzt sind."""
+        return bool(
+            self.google_oauth_client_id
+            and self.google_oauth_client_secret
+            and self.google_oauth_refresh_token
+        )
 
 
 settings = Settings()

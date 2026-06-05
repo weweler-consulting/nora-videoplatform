@@ -1,7 +1,8 @@
 """Spike: validiert Service-Account-Auth + Drive-Erkennung + Big-File-Download.
 
-Voraussetzung: ENV NORA_GOOGLE_SA_JSON, NORA_GOOGLE_IMPERSONATE_SUBJECT,
-NORA_MEET_RECORDINGS_FOLDER_ID (plus NORA_SECRET_KEY für den Config-Import).
+Voraussetzung: ENV NORA_GOOGLE_OAUTH_CLIENT_ID, NORA_GOOGLE_OAUTH_CLIENT_SECRET,
+NORA_GOOGLE_OAUTH_REFRESH_TOKEN, NORA_MEET_RECORDINGS_FOLDER_ID
+(plus NORA_SECRET_KEY für den Config-Import). Refresh-Token via google_oauth_setup.py.
 
   python3 scripts/spike_live_call.py --list
   python3 scripts/spike_live_call.py --download <drive_file_id>

@@ -1,11 +1,12 @@
-"""Drive-Lesezugriff als Service-Account mit Domain-Wide-Delegation.
+"""Drive-Lesezugriff via OAuth (Workspace-interner Client, scope drive.readonly).
 
-Impersoniert den konfigurierten Workspace-Nutzer (nora@…) und liest ausschließlich
-(scope drive.readonly): Video-Dateien im Meet-Recordings-Ordner listen + downloaden.
+Nutzt einen einmalig geholten Refresh-Token (siehe scripts/google_oauth_setup.py),
+um als nora@… zu lesen: Video-Dateien im Meet-Recordings-Ordner listen + downloaden.
+Access-Tokens werden bei Bedarf automatisch erneuert.
 """
 import logging
 
-from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
@@ -14,14 +15,19 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 _SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+_TOKEN_URI = "https://oauth2.googleapis.com/token"
 
 
 def _service():
-    info = settings.google_sa_info
-    if not info or not settings.google_impersonate_subject:
-        raise RuntimeError("Google-Service-Account nicht konfiguriert")
-    creds = service_account.Credentials.from_service_account_info(
-        info, scopes=_SCOPES, subject=settings.google_impersonate_subject,
+    if not settings.google_oauth_configured:
+        raise RuntimeError("Google-OAuth nicht konfiguriert (Client-ID/Secret/Refresh-Token)")
+    creds = Credentials(
+        token=None,
+        refresh_token=settings.google_oauth_refresh_token,
+        client_id=settings.google_oauth_client_id,
+        client_secret=settings.google_oauth_client_secret,
+        token_uri=_TOKEN_URI,
+        scopes=_SCOPES,
     )
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
