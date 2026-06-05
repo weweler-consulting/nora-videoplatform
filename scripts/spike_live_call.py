@@ -13,6 +13,9 @@ import tempfile
 import time
 from datetime import datetime, timedelta
 
+# Repo-Root auf den Pfad, damit `app` auch beim Aufruf aus scripts/ importierbar ist.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from app.core.config import settings
 from app.core.live_call_parser import parse_occurrence_at
 from app.integrations.google_drive import list_video_files, download_to_file
