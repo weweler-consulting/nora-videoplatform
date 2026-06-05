@@ -40,3 +40,4 @@ class LiveCallImport(Base):
     last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True)
     published_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    notified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     google_oauth_client_secret: Optional[str] = None  # NORA_GOOGLE_OAUTH_CLIENT_SECRET
     google_oauth_refresh_token: Optional[str] = None  # NORA_GOOGLE_OAUTH_REFRESH_TOKEN
     meet_recordings_folder_id: Optional[str] = None   # NORA_MEET_RECORDINGS_FOLDER_ID
+    live_call_notify_email: Optional[str] = None       # NORA_LIVE_CALL_NOTIFY_EMAIL
 
     model_config = {"env_prefix": "NORA_"}
 

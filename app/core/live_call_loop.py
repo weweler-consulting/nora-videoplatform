@@ -6,6 +6,7 @@ import logging
 from app.core.config import settings
 from app.core.live_call_detector import detect_new_recordings
 from app.core.live_call_importer import import_pending
+from app.core.live_call_notify import notify_pending_imports
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ async def live_call_loop():
             if settings.google_oauth_configured and settings.meet_recordings_folder_id:
                 await detect_new_recordings()
                 await import_pending()
+                await notify_pending_imports()
             elif not _warned:
                 logger.warning("Live-Call-Import nicht konfiguriert (OAuth/Folder-ID) — Loop wartet.")
                 _warned = True
