@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Megaphone, ClipboardList, ChevronUp, ChevronDown } from 'lucide-react';
-import { api, type CourseDetail, type ModuleItem } from '../../lib/api';
+import { api, type CourseDetail, type ModuleItem, type LiveCallSeriesInfo } from '../../lib/api';
 
 export default function AdminCourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -193,6 +193,9 @@ export default function AdminCourseDetail() {
 
       {/* Stripe Product ID */}
       <StripeProductInput courseId={course.id} initial={course.stripe_product_id} />
+
+      {/* Live-Call-Aufzeichnungen Auto-Import */}
+      <LiveCallMapping courseId={course.id} />
 
       {showCreate && (
         <form onSubmit={handleCreateModule} className="bg-white rounded-2xl p-6 mb-6 shadow-sm space-y-4">
@@ -415,6 +418,92 @@ function HubEnabledToggle({ courseId, initial, onChange }: { courseId: string; i
         />
       </span>
       <span>Mitgliederbereich</span>
+    </button>
+  );
+}
+
+function LiveCallMapping({ courseId }: { courseId: string }) {
+  const [series, setSeries] = useState<LiveCallSeriesInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [prefix, setPrefix] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const load = () => {
+    api.listLiveCallSeries()
+      .then((all) => setSeries(all.find((s) => s.course_id === courseId) || null))
+      .catch(() => setSeries(null))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, [courseId]);
+
+  const startAdd = async () => {
+    setAdding(true);
+    try { setSuggestions(await api.suggestLiveCallPrefixes()); } catch { setSuggestions([]); }
+  };
+  const save = async () => {
+    if (!prefix.trim() || saving) return;
+    setSaving(true);
+    try {
+      await api.createLiveCallSeries({ course_id: courseId, recording_name_prefix: prefix.trim() });
+      setAdding(false); setPrefix(''); setLoading(true); load();
+    } finally { setSaving(false); }
+  };
+  const remove = async () => {
+    if (!series || !confirm('Live-Call-Verknüpfung wirklich entfernen?')) return;
+    await api.deleteLiveCallSeries(series.id);
+    setLoading(true); load();
+  };
+
+  if (loading) return null;
+
+  const videoIcon = (
+    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+    </svg>
+  );
+
+  if (series) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6 flex-wrap">
+        {videoIcon}
+        <span>Live-Call-Import:</span>
+        <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{series.recording_name_prefix}</span>
+        {!series.active && <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">inaktiv</span>}
+        <button onClick={remove} className="text-gray-400 hover:text-red-500 text-xs underline">entfernen</button>
+      </div>
+    );
+  }
+
+  if (adding) {
+    return (
+      <div className="flex items-center gap-2 mb-6 flex-wrap">
+        {videoIcon}
+        <input
+          type="text" list="lc-prefix-options" value={prefix}
+          onChange={(e) => setPrefix(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && save()}
+          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--nora-pink)] w-96"
+          placeholder="Recording-Prefix wählen (aus echten Aufzeichnungen) …" autoFocus
+        />
+        <datalist id="lc-prefix-options">
+          {suggestions.map((s) => <option key={s} value={s} />)}
+        </datalist>
+        <button onClick={save} disabled={saving} className="px-3 py-1.5 text-sm bg-[var(--nora-pink)] text-white rounded-lg hover:bg-[var(--nora-pink-dark)] transition-colors disabled:opacity-60">
+          Verknüpfen
+        </button>
+        <button onClick={() => { setAdding(false); setPrefix(''); }} className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 transition-colors">
+          Abbrechen
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={startAdd} className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 mb-6 transition-colors">
+      {videoIcon}
+      Live-Call-Aufzeichnungen automatisch importieren
     </button>
   );
 }

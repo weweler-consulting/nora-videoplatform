@@ -269,7 +269,42 @@ export const api = {
     }),
   deleteServiceToken: (id: string) =>
     request<{ ok: boolean }>(`/integrations/tokens/${id}`, { method: 'DELETE' }),
+
+  // Live-Call-Auto-Import
+  listLiveCallSeries: () =>
+    request<LiveCallSeriesInfo[]>('/live-calls/series'),
+  createLiveCallSeries: (data: { course_id: string; recording_name_prefix: string }) =>
+    request<LiveCallSeriesInfo>('/live-calls/series', { method: 'POST', body: JSON.stringify(data) }),
+  deleteLiveCallSeries: (id: string) =>
+    request(`/live-calls/series/${id}`, { method: 'DELETE' }),
+  suggestLiveCallPrefixes: () =>
+    request<string[]>('/live-calls/suggest-prefixes'),
+  listLiveCallImports: (status?: string) =>
+    request<LiveCallImportInfo[]>(`/live-calls/imports${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+  approveLiveCallImport: (id: string) =>
+    request<{ ok: boolean }>(`/live-calls/imports/${id}/approve`, { method: 'POST' }),
+  dismissLiveCallImport: (id: string) =>
+    request<{ ok: boolean }>(`/live-calls/imports/${id}/dismiss`, { method: 'POST' }),
 };
+
+export interface LiveCallSeriesInfo {
+  id: string;
+  course_id: string;
+  recording_name_prefix: string;
+  active: boolean;
+}
+
+export interface LiveCallImportInfo {
+  id: string;
+  series_id: string;
+  recording_name: string;
+  occurrence_at: string | null;
+  status: string;
+  module_id: string | null;
+  lesson_id: string | null;
+  course_id: string | null;
+  course_title: string | null;
+}
 
 export interface ServiceTokenInfo {
   id: string;

@@ -275,6 +275,8 @@ class ImportOut(BaseModel):
     status: str
     module_id: str | None
     lesson_id: str | None
+    course_id: str | None = None
+    course_title: str | None = None
 
 
 @router.get("/imports", response_model=list[ImportOut])
@@ -283,8 +285,20 @@ async def list_imports(status: str | None = None, admin: User = Depends(require_
     if status:
         q = q.where(LiveCallImport.status == status)
     rows = (await db.execute(q)).scalars().all()
+    # series_id → (course_id, course_title) für die Anzeige auflösen
+    series_ids = {r.series_id for r in rows}
+    course_map: dict[str, tuple[str, str]] = {}
+    if series_ids:
+        res = await db.execute(
+            select(LiveCallSeries.id, Course.id, Course.title)
+            .join(Course, Course.id == LiveCallSeries.course_id)
+            .where(LiveCallSeries.id.in_(series_ids))
+        )
+        course_map = {sid: (cid, title) for sid, cid, title in res.all()}
     return [ImportOut(id=r.id, series_id=r.series_id, recording_name=r.recording_name,
-                      occurrence_at=r.occurrence_at, status=r.status, module_id=r.module_id, lesson_id=r.lesson_id) for r in rows]
+                      occurrence_at=r.occurrence_at, status=r.status, module_id=r.module_id, lesson_id=r.lesson_id,
+                      course_id=course_map.get(r.series_id, (None, None))[0],
+                      course_title=course_map.get(r.series_id, (None, None))[1]) for r in rows]
 
 
 @router.post("/imports/{import_id}/approve")

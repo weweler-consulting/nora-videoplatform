@@ -11,6 +11,7 @@ import LessonView from './pages/LessonView';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminCourses from './pages/admin/AdminCourses';
 import AdminCourseDetail from './pages/admin/AdminCourseDetail';
+import AdminLiveCalls from './pages/admin/AdminLiveCalls';
 import AdminModuleDetail from './pages/admin/AdminModuleDetail';
 import AdminCheckinDetail from './pages/admin/AdminCheckinDetail';
 import AdminCourseHub from './pages/admin/AdminCourseHub';
@@ -60,6 +61,7 @@ export default function App() {
                   <Route path="/admin/course/:courseId/checkin/:lessonId" element={<AdminCheckinDetail />} />
                   <Route path="/admin/course/:courseId/hub" element={<AdminCourseHub />} />
                   <Route path="/admin/course/:courseId/announcements" element={<AdminCourseAnnouncements />} />
+                  <Route path="/admin/live-calls" element={<AdminLiveCalls />} />
                   <Route path="/admin/users" element={<AdminUsers />} />
                   <Route path="/admin/integrations" element={<AdminIntegrations />} />
                   <Route path="/settings" element={<AdminSettings />} />
