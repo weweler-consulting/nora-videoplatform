@@ -163,3 +163,43 @@ async def dismiss_link(import_id: str, token: str, db: AsyncSession = Depends(ge
         return HTMLResponse(_page("Import nicht gefunden."), status_code=404)
     await _dismiss(db, imp)
     return HTMLResponse(_page("Verworfen ✅ — Lektion und Video wurden entfernt."))
+
+
+# --- Admin-Liste + Admin-Aktionen (für die Pending-Review-Oberfläche) ---
+
+class ImportOut(BaseModel):
+    id: str
+    series_id: str
+    recording_name: str
+    occurrence_at: datetime | None
+    status: str
+    module_id: str | None
+    lesson_id: str | None
+
+
+@router.get("/imports", response_model=list[ImportOut])
+async def list_imports(status: str | None = None, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    q = select(LiveCallImport).order_by(LiveCallImport.created_at.desc())
+    if status:
+        q = q.where(LiveCallImport.status == status)
+    rows = (await db.execute(q)).scalars().all()
+    return [ImportOut(id=r.id, series_id=r.series_id, recording_name=r.recording_name,
+                      occurrence_at=r.occurrence_at, status=r.status, module_id=r.module_id, lesson_id=r.lesson_id) for r in rows]
+
+
+@router.post("/imports/{import_id}/approve")
+async def admin_approve(import_id: str, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    imp = (await db.execute(select(LiveCallImport).where(LiveCallImport.id == import_id))).scalar_one_or_none()
+    if not imp:
+        raise HTTPException(404, "Import nicht gefunden")
+    await _approve(db, imp)
+    return {"ok": True}
+
+
+@router.post("/imports/{import_id}/dismiss")
+async def admin_dismiss(import_id: str, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    imp = (await db.execute(select(LiveCallImport).where(LiveCallImport.id == import_id))).scalar_one_or_none()
+    if not imp:
+        raise HTTPException(404, "Import nicht gefunden")
+    await _dismiss(db, imp)
+    return {"ok": True}
