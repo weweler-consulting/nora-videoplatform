@@ -1,5 +1,6 @@
 """Findet neue Meet-Recordings im Drive-Ordner und legt LiveCallImport-Zeilen an.
 Dedup über drive_file_id → mehrfaches Laufen erzeugt keine Duplikate."""
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -32,7 +33,8 @@ async def detect_new_recordings() -> int:
 
         for series in series_rows:
             try:
-                files = list_video_files(folder, series.recording_name_prefix, since)
+                # Blockierender Google-API-Call → in einen Thread, Event-Loop frei halten.
+                files = await asyncio.to_thread(list_video_files, folder, series.recording_name_prefix, since)
             except Exception as e:  # Drive/Auth-Fehler → diese Runde überspringen
                 logger.warning(f"Live-Call-Detector: Drive-Listing fehlgeschlagen ({series.recording_name_prefix}): {e}")
                 continue

@@ -33,6 +33,7 @@ class LiveCallImport(Base):
     recording_name: Mapped[str] = mapped_column(String, nullable=False)
     occurrence_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     module_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    module_created: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     lesson_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     # 'new' | 'imported' | 'published' | 'dismissed' | 'failed'
     status: Mapped[str] = mapped_column(String, nullable=False, default="new", server_default="new")

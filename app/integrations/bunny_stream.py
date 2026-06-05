@@ -26,8 +26,11 @@ def upload_video_from_file(title: str, file_path: str) -> str:
     create.raise_for_status()
     video_id = create.json()["guid"]
 
+    # Endlicher Timeout statt None — ein hängender Upload darf nicht ewig blockieren.
+    # Großzügige read/write-Fenster (30 Min) für GB-Dateien, schneller connect.
+    upload_timeout = httpx.Timeout(connect=30.0, read=1800.0, write=1800.0, pool=30.0)
     with open(file_path, "rb") as fh:
-        up = httpx.put(f"{base}/{video_id}", headers=headers, content=fh, timeout=None)
+        up = httpx.put(f"{base}/{video_id}", headers=headers, content=fh, timeout=upload_timeout)
     up.raise_for_status()
 
     return f"https://iframe.mediadelivery.net/embed/{library_id}/{video_id}"

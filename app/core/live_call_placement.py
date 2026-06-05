@@ -8,12 +8,12 @@ from app.models.course import Module, Section, Lesson
 
 
 def _date_variants(d: datetime) -> list[str]:
-    """DE-Datumsformate, die in Modultiteln vorkommen können."""
+    """DE-Datumsformate MIT Jahr, die in Modultiteln vorkommen können. Bewusst
+    OHNE jahrlose Varianten ('2.10.') — die matchen sonst falsches Jahr/andere
+    Zahlen als Teilstring. str-basiert statt strftime('%-d') → plattform-portabel."""
     return [
-        d.strftime("%d.%m.%Y"),   # 02.10.2026
-        d.strftime("%-d.%-m.%Y"), # 2.10.2026
-        d.strftime("%d.%m."),     # 02.10.
-        d.strftime("%-d.%-m."),   # 2.10.
+        f"{d.day:02d}.{d.month:02d}.{d.year}",  # 02.10.2026
+        f"{d.day}.{d.month}.{d.year}",          # 2.10.2026
     ]
 
 
@@ -48,11 +48,13 @@ async def _ensure_section(db, module_id: str) -> str:
     return sec.id
 
 
-async def resolve_target_section(db, course_id: str, occurrence_at: datetime) -> tuple[str, str]:
-    """(section_id, module_id) für die Live-Call-Lektion."""
+async def resolve_target_section(db, course_id: str, occurrence_at: datetime) -> tuple[str, str, bool]:
+    """(section_id, module_id, module_created). module_created=True, wenn ein neues
+    Modul angelegt wurde (vs. einen bestehenden Platzhalter gefüllt) — relevant fürs
+    Aufräumen beim Verwerfen."""
     placeholder = await _find_placeholder(db, course_id, occurrence_at)
     if placeholder is not None:
-        return await _ensure_section(db, placeholder.id), placeholder.id
+        return await _ensure_section(db, placeholder.id), placeholder.id, False
 
     next_order = ((await db.execute(
         select(func.max(Module.sort_order)).where(Module.course_id == course_id)
@@ -61,4 +63,4 @@ async def resolve_target_section(db, course_id: str, occurrence_at: datetime) ->
     db.add(module)
     await db.flush()
     section_id = await _ensure_section(db, module.id)
-    return section_id, module.id
+    return section_id, module.id, True
