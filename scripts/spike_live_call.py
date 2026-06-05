@@ -12,7 +12,7 @@ import os
 import sys
 import tempfile
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Repo-Root auf den Pfad, damit `app` auch beim Aufruf aus scripts/ importierbar ist.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,7 +26,7 @@ PREFIX = "Live Call | Glukose Balance"  # für den Spike fest; in Phase 2 aus de
 
 def cmd_list() -> None:
     folder = settings.meet_recordings_folder_id
-    since = (datetime.utcnow() - timedelta(days=60)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    since = (datetime.now(timezone.utc) - timedelta(days=60)).strftime("%Y-%m-%dT%H:%M:%SZ")
     files = list_video_files(folder, PREFIX, since)
     print(f"{len(files)} Video-Datei(en) mit Prefix '{PREFIX}':")
     for f in files:

@@ -160,3 +160,18 @@ Mit **einem echten Recording** validieren:
 
 - Recording-Name-Prefix des 2. Kurses (Eindeutigkeit ggü. `Live Call | Glukose Balance`) → beim
   Setup festlegen.
+
+## Spike-Ergebnisse (2026-06-05) — alle drei Unbekannten bestätigt
+
+- **Auth:** OAuth-Consent-Screen **User-Type „Intern"** + OAuth-Client **Typ Desktop** + einmaliger
+  Refresh-Token (InstalledAppFlow) → liest Noras Drive ohne weitere Verifizierung. Service-Account
+  scheiterte an Org-Policy `iam.disableServiceAccountKeyCreation` (Pivot zu OAuth dokumentiert oben).
+- **Erkennung:** Drive-Query `'<folder>' in parents and trashed=false and mimeType contains 'video/'
+  and modifiedTime > '<iso>'`, danach clientseitiger `name.startswith(prefix)`-Filter. Liefert
+  **exakt die 6 Gruppen-Recordings** (wöchentlich Do 19:14, 04/30–06/04), **ohne** die Notizen-Google-Docs
+  (anderer mimeType) und **ohne** 1:1-Calls/Beratungsgespräche (anderer Name-Prefix).
+- **Namensschema bestätigt:** `Live Call | Glukose Balance - YYYY/MM/DD HH:MM WEST - Recording`,
+  mimeType `video/mp4`, 538 MB–1,15 GB. Parser zog alle 6 Daten korrekt (inkl. WEST). Drive-`id`
+  ist stabiler Dedup-Schlüssel.
+- **Download:** chunked (`MediaIoBaseDownload`, 8-MB-Chunks) auf Platte, 538 MB in ~95 s
+  (5,7 MB/s lokale Leitung), kein RAM-Blowup. Phase 2: Drive→Temp→Bunny streamen, Temp löschen.
