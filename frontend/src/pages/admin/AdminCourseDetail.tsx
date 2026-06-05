@@ -294,6 +294,7 @@ export default function AdminCourseDetail() {
         <div className="space-y-3">
           {course.modules.map((module, idx) => {
             const lessonCount = module.sections.reduce((sum, s) => sum + s.lessons.length, 0);
+            const hasHidden = module.sections.some((s) => s.lessons.some((l) => l.is_published === false));
             const editTarget = module.is_checkin && module.checkin_lesson_id
               ? `/admin/course/${courseId}/checkin/${module.checkin_lesson_id}`
               : `/admin/course/${courseId}/module/${module.id}`;
@@ -335,6 +336,11 @@ export default function AdminCourseDetail() {
                       {module.is_checkin && (
                         <span className="text-xs font-medium text-[var(--nora-pink-dark)] bg-[var(--nora-pink-light)] px-2 py-0.5 rounded-full">
                           Check-In{module.checkin_typ === 'start' ? ' · Start' : module.checkin_typ === 'laufend' ? ' · laufend' : module.checkin_typ === 'ende' ? ' · Abschluss' : ''}
+                        </span>
+                      )}
+                      {hasHidden && (
+                        <span className="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full" title="Enthält versteckte (noch nicht freigegebene) Lektionen">
+                          Entwurf · versteckt
                         </span>
                       )}
                     </div>

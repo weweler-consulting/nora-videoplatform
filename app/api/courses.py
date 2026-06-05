@@ -83,6 +83,7 @@ def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: date
                     duration_minutes=lesson.duration_minutes,
                     sort_order=lesson.sort_order, completed=is_done,
                     type=lesson_type,
+                    is_published=getattr(lesson, "is_published", True),
                 ))
                 mod_lessons += 1
                 mod_duration += lesson.duration_minutes

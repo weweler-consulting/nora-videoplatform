@@ -35,6 +35,7 @@ class LessonOut(BaseModel):
     sort_order: int
     completed: bool = False
     type: str = "video"  # 'video' | 'checkin'
+    is_published: bool = True  # False = versteckt (z.B. auto-importierter Live-Call vor Freigabe)
 
 
 class SectionOut(BaseModel):

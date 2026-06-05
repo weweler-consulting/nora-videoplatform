@@ -375,6 +375,7 @@ export interface LessonItem {
   sort_order: number;
   completed: boolean;
   type: 'video' | 'checkin';
+  is_published?: boolean;
 }
 
 export interface SectionItem {
