@@ -40,14 +40,17 @@ Auto-Schnitt/Trimmen; Multi-Coach; Import von 1:1-Calls/Beratungsgesprächen.
 
 ## Auth
 
-**Service-Account mit Domain-Wide-Delegation**, impersoniert `nora@noraweweler.de`.
-Scope: `https://www.googleapis.com/auth/drive.readonly` (Listing + Download der Recordings).
-Kein interaktives „Google verbinden", kein Token-Refresh-Handling.
+**OAuth eines Workspace-internen Clients** (User-Type „Intern" → `drive.readonly` ohne Google-
+App-Verifizierung). Hintergrund: Die Org-Policy `iam.disableServiceAccountKeyCreation` blockiert
+Service-Account-Keys (genau die Wand, an der auch das CRM-Setup scheiterte → das CRM nutzt
+deshalb ebenfalls OAuth). Ein Refresh-Token wird **einmalig** per `scripts/google_oauth_setup.py`
+(InstalledAppFlow, Browser-Consent als nora@) geholt; Access-Tokens danach automatisch erneuert.
 
-ENV:
-- `GOOGLE_SA_JSON` (Service-Account-Key, JSON-String oder Pfad)
-- `GOOGLE_IMPERSONATE_SUBJECT=nora@noraweweler.de`
-- `MEET_RECORDINGS_FOLDER_ID` (Default `1rruYIZ956dNjllrenSGleL4UoZHZuM9h`)
+ENV (Prefix `NORA_`):
+- `NORA_GOOGLE_OAUTH_CLIENT_ID`
+- `NORA_GOOGLE_OAUTH_CLIENT_SECRET`
+- `NORA_GOOGLE_OAUTH_REFRESH_TOKEN`
+- `NORA_MEET_RECORDINGS_FOLDER_ID` (Default `1rruYIZ956dNjllrenSGleL4UoZHZuM9h`)
 
 Kalender-API wird für die Erkennung **nicht** benötigt (Drive-Name trägt Kurs + Datum). Optional
 später, falls reichere Termin-Metadaten gewünscht.
@@ -139,9 +142,11 @@ Mit **einem echten Recording** validieren:
 
 ## Setup-Anforderungen (operativ)
 
-- GCP-Projekt + Service-Account, **Domain-Wide-Delegation** in der Workspace-Admin-Konsole
-  (Scope `drive.readonly`, Subject `nora@noraweweler.de`), Drive-API aktiviert.
-- ENV setzen (`GOOGLE_SA_JSON`, `GOOGLE_IMPERSONATE_SUBJECT`, `MEET_RECORDINGS_FOLDER_ID`).
+- GCP-Projekt `nora-automation` (Org `noraweweler.de`), Drive-API aktiviert.
+- OAuth-Consent-Screen **User-Type „Intern"**; OAuth-Client **Typ Desktop** → Client-ID + Secret.
+- Einmalig `scripts/google_oauth_setup.py <client_secret.json>` laufen lassen (Consent als nora@)
+  → Refresh-Token. Die drei Werte als ENV setzen (`NORA_GOOGLE_OAUTH_CLIENT_ID/_SECRET/_REFRESH_TOKEN`)
+  + `NORA_MEET_RECORDINGS_FOLDER_ID`.
 - **Eindeutiger Live-Call-Titel pro Kurs:** Der 2. Kurs darf nicht denselben Prefix
   `Live Call | Glukose Balance` nutzen, sonst Kollision. Beim Setup prüfen/abgrenzen.
 

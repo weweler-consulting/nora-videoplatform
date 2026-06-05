@@ -14,16 +14,20 @@
 
 ## Phase 0: Operative Vorbereitung (User-Aktion — von mir begleitet, KEIN Code)
 
+> **Auth-Pivot:** Statt Service-Account → **OAuth** (Workspace-interner Client). Grund: Org-Policy
+> `iam.disableServiceAccountKeyCreation` blockiert SA-Keys. Tasks 3–5 wurden entsprechend auf
+> OAuth refaktoriert (Config: `google_oauth_*`; Drive-Client: Refresh-Token-Credentials;
+> neues `scripts/google_oauth_setup.py`).
+
 Diese Schritte macht Justus in GCP/Workspace; ohne sie kann der Spike nicht laufen.
 
-- [ ] **0.1** GCP-Projekt wählen/anlegen, **Google Drive API** aktivieren.
-- [ ] **0.2** Service-Account anlegen, **JSON-Key** erzeugen und herunterladen.
-- [ ] **0.3** In der **Workspace-Admin-Konsole** → Sicherheit → API-Steuerung → **Domain-Wide-Delegation**: die Client-ID des Service-Accounts mit Scope `https://www.googleapis.com/auth/drive.readonly` autorisieren.
-- [ ] **0.4** ENV auf dem Kurse-Container setzen (`/app/data/env.sh`, export-Syntax — siehe Memory `reference_cloudron_env_management`):
-  - `GOOGLE_SA_JSON='{...}'` (kompletter JSON-Key als String)
-  - `GOOGLE_IMPERSONATE_SUBJECT=nora@noraweweler.de`
-  - `MEET_RECORDINGS_FOLDER_ID=1rruYIZ956dNjllrenSGleL4UoZHZuM9h`
-- [ ] **0.5** Für den lokalen Spike denselben JSON-Key als Datei ablegen und `GOOGLE_SA_JSON` lokal exportieren (nicht committen — `.gitignore` prüfen).
+- [x] **0.1** GCP-Projekt `nora-automation` (Org `noraweweler.de`) angelegt, **Google Drive API** aktiviert.
+- [ ] **0.2** **OAuth-Consent-Screen** → User-Type **„Intern"** (App-Name `Nora Live-Call Import`).
+- [ ] **0.3** **OAuth-Client-ID** (Typ **Desktop-App**) erstellen → Client-Secret-JSON herunterladen.
+- [ ] **0.4** Einmaliger Consent: `python3 scripts/google_oauth_setup.py <client_secret.json>` lokal laufen lassen → im Browser als `nora@noraweweler.de` Drive-Lesezugriff bestätigen → gibt Client-ID, Secret, Refresh-Token aus.
+- [ ] **0.5** Diese drei + Folder-ID als ENV setzen (lokal für den Spike, später `/app/data/env.sh`):
+  `NORA_GOOGLE_OAUTH_CLIENT_ID`, `NORA_GOOGLE_OAUTH_CLIENT_SECRET`, `NORA_GOOGLE_OAUTH_REFRESH_TOKEN`,
+  `NORA_MEET_RECORDINGS_FOLDER_ID=1rruYIZ956dNjllrenSGleL4UoZHZuM9h`. Nicht committen.
 
 ---
 
