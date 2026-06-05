@@ -43,7 +43,7 @@ async def _checkin_typ_map(db: AsyncSession, course: Course) -> dict[str, str]:
     return {row[0]: row[1] for row in result.all()}
 
 
-def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: datetime | None = None, unlocked_module_ids: set[str] | None = None, checkin_typ_by_template_id: dict[str, str] | None = None) -> CourseOut:
+def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: datetime | None = None, unlocked_module_ids: set[str] | None = None, checkin_typ_by_template_id: dict[str, str] | None = None, include_hidden: bool = False) -> CourseOut:
     checkin_typ_by_template_id = checkin_typ_by_template_id or {}
     modules_out = []
     total_lessons = 0
@@ -70,6 +70,8 @@ def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: date
         for section in module.sections:
             lessons_out = []
             for lesson in section.lessons:
+                if not include_hidden and not getattr(lesson, "is_published", True):
+                    continue  # versteckte (auto-importierte, noch nicht freigegebene) Lektion
                 is_done = lesson.id in completed_ids
                 lesson_type = getattr(lesson, "type", "video") or "video"
                 if lesson_type == "checkin" and checkin_lesson is None:
@@ -250,4 +252,4 @@ async def admin_get_course(course_id: str, admin: User = Depends(require_admin),
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
     checkin_map = await _checkin_typ_map(db, course)
-    return _build_course_out(course, set(), checkin_typ_by_template_id=checkin_map)
+    return _build_course_out(course, set(), checkin_typ_by_template_id=checkin_map, include_hidden=True)
