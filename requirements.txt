@@ -13,3 +13,6 @@ slowapi==0.1.9
 bleach==6.2.0
 pytest==8.3.4
 pytest-asyncio==0.25.0
+google-api-python-client==2.197.0
+google-auth==2.53.0
+google-auth-oauthlib==1.4.0

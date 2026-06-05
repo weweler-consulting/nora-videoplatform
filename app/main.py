@@ -16,10 +16,12 @@ from sqlalchemy import text
 from app.core.db import engine, Base
 from app.core.drip_notifier import drip_notifier_loop
 from app.core.crm_sync import crm_sync_loop
+from app.core.live_call_loop import live_call_loop
 from app.core.ratelimit import limiter
-from app.api import auth, courses, hub, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook, attachments, integrations, admin_hub, announcements, checkin
+from app.api import auth, courses, hub, modules, sections, lessons, users, progress, upload, dashboard, stripe_webhook, attachments, integrations, admin_hub, announcements, checkin, live_calls
 from app.models import hub as _hub_models  # noqa: F401 — register Hub tables with Base
 from app.models import checkin as _checkin_models  # noqa: F401 — register Check-In tables with Base
+from app.models import live_call as _live_call_models  # noqa: F401 — register Live-Call tables with Base
 from app.core.checkin_seed import seed_checkin_templates, sync_checkin_default_texts, migrate_laufend_step_keys
 from sqlalchemy import select
 
@@ -64,6 +66,7 @@ def _build_migration_statements() -> list[str]:
         "ALTER TABLE lessons ADD COLUMN type VARCHAR DEFAULT 'video' NOT NULL",
         "ALTER TABLE lessons ADD COLUMN checkin_template_id VARCHAR",
         "ALTER TABLE lessons ADD COLUMN checkin_overrides JSON",
+        "ALTER TABLE lessons ADD COLUMN is_published BOOLEAN DEFAULT TRUE NOT NULL",
     ]
     # Re-create FK constraints with ON DELETE CASCADE (A3 from audit)
     for child, col, parent in _FK_CASCADES:
@@ -201,9 +204,11 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Check-in template seed failed: {e}")
     task = asyncio.create_task(drip_notifier_loop())
     crm_task = asyncio.create_task(crm_sync_loop())
+    live_call_task = asyncio.create_task(live_call_loop())
     yield
     task.cancel()
     crm_task.cancel()
+    live_call_task.cancel()
 
 
 app = FastAPI(title="Nora Videoplatform API", version="0.1.0", lifespan=lifespan)
@@ -238,6 +243,7 @@ app.include_router(hub.router, prefix="/api/v1/courses", tags=["hub"])
 app.include_router(admin_hub.router, prefix="/api/v1/admin/courses", tags=["admin_hub"])
 app.include_router(announcements.router, prefix="/api/v1/admin/courses", tags=["announcements"])
 app.include_router(checkin.router, prefix="/api/v1/checkin", tags=["checkin"])
+app.include_router(live_calls.router, prefix="/api/v1/live-calls", tags=["live-calls"])
 
 
 @app.get("/api/v1/health")

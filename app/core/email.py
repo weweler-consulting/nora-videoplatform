@@ -272,6 +272,20 @@ def _send_smtp(config: dict, msg: MIMEMultipart):
             smtp.send_message(msg)
 
 
+def send_simple_email(to_email: str, subject: str, html: str) -> bool:
+    """Schlichte interne HTML-Mail (z.B. Live-Call-Freigabe an Nora). True wenn versendet."""
+    config = get_smtp_config()
+    if not config:
+        return False
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = config["from_addr"]
+    msg["To"] = to_email
+    msg.attach(MIMEText(html, "html", "utf-8"))
+    _send_smtp(config, msg)
+    return True
+
+
 def send_course_added_email(
     to_email: str,
     to_name: str,

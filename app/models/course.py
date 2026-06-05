@@ -67,6 +67,8 @@ class Lesson(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     # Discriminator: 'video' (Default, bestehende Lektionen) | 'checkin'
     type: Mapped[str] = mapped_column(String, default="video", server_default="video", nullable=False)
+    # Versteckt (False) = z.B. auto-importierte Live-Call-Lektion vor Freigabe.
+    is_published: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     # Nur bei type='checkin': genutztes Template + instanz-eigene Overrides
     # (z. B. die wechselnde Wochenfrage 'umsetzung'). Loser Verweis ohne DB-FK,
     # analog Announcement.target_id — hält additive Live-Migration einfach.
