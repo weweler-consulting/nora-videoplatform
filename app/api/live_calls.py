@@ -6,6 +6,7 @@ filtert bereits gemappte raus → im Admin anklickbar statt abtippen.
 import asyncio
 import re
 from datetime import datetime, timedelta, timezone
+from html import escape
 
 from fastapi import APIRouter, Depends, HTTPException, Form
 from fastapi.responses import HTMLResponse
@@ -22,7 +23,7 @@ from app.core.live_call_token import verify_action_token
 from app.core.time import utc_now
 from app.integrations.bunny_stream import delete_video_by_embed_url
 from app.integrations.google_drive import list_video_files
-from app.models.course import Lesson, Announcement, Enrollment, Section, Module
+from app.models.course import Lesson, Announcement, Enrollment, Section, Module, Course
 from app.models.live_call import LiveCallSeries, LiveCallImport
 from app.models.user import User
 
@@ -173,14 +174,32 @@ async def _approve(db, imp: LiveCallImport) -> None:
     await db.commit()
 
 
+async def _import_label(db, imp: LiveCallImport) -> tuple[str, str]:
+    """(Datum, Kurstitel) für die Bestätigungsseite — beides HTML-escaped."""
+    datum = imp.occurrence_at.strftime("%d.%m.%Y") if imp.occurrence_at else "—"
+    kurs = "—"
+    series = (await db.execute(select(LiveCallSeries).where(LiveCallSeries.id == imp.series_id))).scalar_one_or_none()
+    if series:
+        c = (await db.execute(select(Course).where(Course.id == series.course_id))).scalar_one_or_none()
+        if c:
+            kurs = c.title
+    return escape(datum), escape(kurs)
+
+
 @router.get("/approve", response_class=HTMLResponse)
-async def approve_confirm(import_id: str, token: str):
+async def approve_confirm(import_id: str, token: str, db: AsyncSession = Depends(get_db)):
     if verify_action_token(token, "approve") != import_id:
         return HTMLResponse(_page("Ungültiger oder abgelaufener Link."), status_code=400)
+    imp = (await db.execute(select(LiveCallImport).where(LiveCallImport.id == import_id))).scalar_one_or_none()
+    if not imp:
+        return HTMLResponse(_page("Import nicht gefunden."), status_code=404)
+    if imp.status == "published":
+        return HTMLResponse(_page("Bereits freigegeben ✅"))
+    datum, kurs = await _import_label(db, imp)
     return HTMLResponse(_confirm_page(
         "/api/v1/live-calls/approve", import_id, token,
-        "Live-Call freigeben?", "Ja, freigeben & ankündigen",
-        "Die Lektion wird sichtbar und die Kundinnen bekommen die Ankündigungs-Mail.",
+        f"Live-Call vom {datum} freigeben?", "Ja, freigeben &amp; ankündigen",
+        f"Kurs: <b>{kurs}</b>. Die Lektion wird sichtbar und die Kundinnen bekommen die Ankündigungs-Mail.",
     ))
 
 
@@ -223,12 +242,15 @@ async def dismiss_confirm(import_id: str, token: str, db: AsyncSession = Depends
     if verify_action_token(token, "dismiss") != import_id:
         return HTMLResponse(_page("Ungültiger oder abgelaufener Link."), status_code=400)
     imp = (await db.execute(select(LiveCallImport).where(LiveCallImport.id == import_id))).scalar_one_or_none()
-    if imp and imp.status == "published":
+    if not imp:
+        return HTMLResponse(_page("Import nicht gefunden."), status_code=404)
+    if imp.status == "published":
         return HTMLResponse(_page("Schon freigegeben — Verwerfen nicht möglich."))
+    datum, kurs = await _import_label(db, imp)
     return HTMLResponse(_confirm_page(
         "/api/v1/live-calls/dismiss", import_id, token,
-        "Live-Call verwerfen?", "Ja, verwerfen",
-        "Die (versteckte) Lektion und das hochgeladene Video werden gelöscht.",
+        f"Live-Call vom {datum} verwerfen?", "Ja, verwerfen",
+        f"Kurs: <b>{kurs}</b>. Die (versteckte) Lektion und das hochgeladene Video werden gelöscht.",
     ))
 
 
