@@ -4,7 +4,8 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import create_access_token, hash_password
-from app.core.checkin_seed import seed_checkin_templates
+from app.core.checkin_seed import seed_checkin_templates, sync_checkin_default_texts
+from app.models.checkin import CheckinTemplate, CheckinStep
 from app.models.course import Course, Module, Section, Lesson, Enrollment, LessonProgress
 from app.models.checkin import CheckinResponse, CrmOutbox
 from app.models.user import User
@@ -66,7 +67,7 @@ async def test_list_templates_after_seed(client, session):
     r = await client.get("/api/v1/checkin/templates", headers=_auth(admin))
     assert r.status_code == 200
     typen = {t["typ"] for t in r.json()}
-    assert {"start", "laufend"} <= typen
+    assert {"start", "laufend", "ende"} <= typen
 
 
 @pytest.mark.asyncio
@@ -585,3 +586,85 @@ async def test_submit_includes_ordered_questions_in_outbox(client, session):
     assert wohl["typ"] == "skala" and wohl["skala_max"] == 10
     ums = next(q for q in questions if q["key"] == "umsetzung")
     assert ums["frage"] == "Eigene Wochenfrage?"
+
+
+@pytest.mark.asyncio
+async def test_submit_ende_checkin_mirrors_start_and_captures_upsell(client, session):
+    """Abschluss-Formular: gespiegelte keys (energie/heisshunger/nachmittagstief)
+    fürs Vorher/Nachher + premium_interesse als CRM-Datenpunkt."""
+    await seed_checkin_templates()
+    admin = await _mk_user(session, admin=True)
+    course = await _mk_course(session)
+    created = (await client.post(
+        "/api/v1/checkin/modules", headers=_auth(admin),
+        json={"course_id": course.id, "template_typ": "ende"},
+    )).json()
+    lesson_id = created["lesson_id"]
+
+    klientin = await _mk_user(session, admin=False)
+    await _enroll(session, klientin.id, course.id)
+
+    # Pflichtfelder = die gespiegelten Skalen/Auswahlen; offene Felder optional.
+    answers = {
+        "energie": 9,
+        "nachmittagstief": "selten",
+        "heisshunger": "nie",
+        "rueckblick": "Viel mehr Energie, kein Nachmittagstief mehr.",
+        "premium_interesse": "Ja, erzähl mir mehr",
+    }
+    rok = await client.post(
+        f"/api/v1/checkin/lessons/{lesson_id}/submit", headers=_auth(klientin),
+        json={"answers": answers},
+    )
+    assert rok.status_code == 200, rok.text
+
+    # Response-Zeile trägt template_typ='ende'
+    resp = (await session.execute(_select(CheckinResponse).where(
+        CheckinResponse.user_id == klientin.id, CheckinResponse.lesson_id == lesson_id))).scalar_one()
+    assert resp.template_typ == "ende"
+
+    # CRM-Payload: template_typ='ende', gespiegelte keys vorhanden (Vorher/Nachher),
+    # Upsell-Interesse als erfasster Datenpunkt.
+    row = (await session.execute(_select(CrmOutbox).order_by(CrmOutbox.created_at.desc()))).scalars().first()
+    assert row.payload["template_typ"] == "ende"
+    assert row.payload["answers"]["premium_interesse"] == "Ja, erzähl mir mehr"
+    qkeys = {q["key"] for q in row.payload["questions"]}
+    assert {"energie", "heisshunger", "nachmittagstief", "premium_interesse"} <= qkeys
+
+
+@pytest.mark.asyncio
+async def test_sync_default_texts_lifts_old_laufend_wording(client, session):
+    """Live-Korrektur: alte win/huerde-Defaults werden angehoben, nur solange
+    sie noch den alten Text tragen (sonst No-op -> manuelle Edits bleiben)."""
+    await seed_checkin_templates()
+
+    async def _frage(key: str) -> str:
+        # sync_checkin_default_texts() committet in einer eigenen Session;
+        # expire_all() zwingt die Test-Session, frisch aus der DB zu lesen.
+        session.expire_all()
+        row = (await session.execute(_select(CheckinStep).join(
+            CheckinTemplate, CheckinStep.template_id == CheckinTemplate.id).where(
+            CheckinTemplate.typ == "laufend", CheckinStep.key == key))).scalar_one()
+        return row.frage
+
+    # Simuliere den Live-Altzustand (DB wurde vor der Text-Änderung geseedet).
+    for key, old in [("win", "Dein größter Win diese Woche?"),
+                     ("huerde", "Wo hast du gehakt?")]:
+        step = (await session.execute(_select(CheckinStep).join(
+            CheckinTemplate, CheckinStep.template_id == CheckinTemplate.id).where(
+            CheckinTemplate.typ == "laufend", CheckinStep.key == key))).scalar_one()
+        step.frage = old
+    await session.commit()
+
+    await sync_checkin_default_texts()
+    assert await _frage("win") == "Dein größter Erfolg diese Woche?"
+    assert await _frage("huerde") == "Wo hat es nicht geklappt?"
+
+    # Idempotent + schützt manuelle Edits: ein abweichender Text bleibt unangetastet.
+    custom = (await session.execute(_select(CheckinStep).join(
+        CheckinTemplate, CheckinStep.template_id == CheckinTemplate.id).where(
+        CheckinTemplate.typ == "laufend", CheckinStep.key == "win"))).scalar_one()
+    custom.frage = "Mein eigener Text"
+    await session.commit()
+    await sync_checkin_default_texts()
+    assert await _frage("win") == "Mein eigener Text"

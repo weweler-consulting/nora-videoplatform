@@ -11,7 +11,7 @@ export default function AdminCourseDetail() {
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [showCheckin, setShowCheckin] = useState(false);
-  const [checkinTyp, setCheckinTyp] = useState<'start' | 'laufend'>('start');
+  const [checkinTyp, setCheckinTyp] = useState<'start' | 'laufend' | 'ende'>('start');
   const [checkinWeek, setCheckinWeek] = useState<number | ''>('');
   const [reordering, setReordering] = useState(false);
 
@@ -244,6 +244,13 @@ export default function AdminCourseDetail() {
               >
                 Wöchentlicher Check-in
               </button>
+              <button
+                type="button"
+                onClick={() => setCheckinTyp('ende')}
+                className={`px-4 py-2 rounded-lg text-sm border transition-colors ${checkinTyp === 'ende' ? 'bg-[var(--nora-pink)] text-white border-transparent' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+              >
+                Abschluss (nach Woche 4)
+              </button>
             </div>
           </div>
           {checkinTyp === 'laufend' && (
@@ -327,7 +334,7 @@ export default function AdminCourseDetail() {
                       </h3>
                       {module.is_checkin && (
                         <span className="text-xs font-medium text-[var(--nora-pink-dark)] bg-[var(--nora-pink-light)] px-2 py-0.5 rounded-full">
-                          Check-In{module.checkin_typ === 'start' ? ' · Start' : module.checkin_typ === 'laufend' ? ' · laufend' : ''}
+                          Check-In{module.checkin_typ === 'start' ? ' · Start' : module.checkin_typ === 'laufend' ? ' · laufend' : module.checkin_typ === 'ende' ? ' · Abschluss' : ''}
                         </span>
                       )}
                     </div>
