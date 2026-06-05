@@ -132,11 +132,18 @@ async def _send_lesson_announcement(db, course_id: str, lesson_id: str, subject:
     db.add(Announcement(course_id=course_id, target_type="lesson", target_id=lesson_id,
                         subject=subject, body=body, recipient_count=len(enrolled), created_by_user_id=None))
     cta_url = f"{PLATFORM_BASE_URL}/course/{course_id}/lesson/{lesson_id}"
-    for u in enrolled:
-        try:
-            send_announcement_email(to_email=u.email, to_name=u.name or "", subject=subject, body_text=body, cta_url=cta_url)
-        except Exception:
-            pass
+
+    def _fanout() -> None:
+        # Blockierendes smtplib (pro Empfängerin) gebündelt in EINEM Thread —
+        # der Event-Loop bleibt frei. ORM-Attribute sind geladen (expire_on_commit
+        # =False), daher in-Thread lesbar ohne DB-Zugriff.
+        for u in enrolled:
+            try:
+                send_announcement_email(to_email=u.email, to_name=u.name or "", subject=subject, body_text=body, cta_url=cta_url)
+            except Exception:
+                pass
+
+    await asyncio.to_thread(_fanout)
 
 
 async def _approve(db, imp: LiveCallImport) -> None:

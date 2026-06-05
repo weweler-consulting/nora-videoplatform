@@ -1,5 +1,6 @@
 """Mailt Nora eine 1-Klick-Freigabe-Mail für neu importierte (versteckte)
 Live-Call-Lektionen. Sendet einmal pro Import (notified_at), best-effort."""
+import asyncio
 import logging
 
 from sqlalchemy import select
@@ -51,7 +52,11 @@ async def notify_pending_imports() -> int:
         for imp in rows:
             datum = imp.occurrence_at.strftime("%d.%m.%Y") if imp.occurrence_at else ""
             try:
-                if send_simple_email(to, f"Neue Live-Call-Aufzeichnung vom {datum} – freigeben?", _email_html(imp)):
+                # Blockierendes smtplib in einen Thread — Loop bleibt frei.
+                ok = await asyncio.to_thread(
+                    send_simple_email, to, f"Neue Live-Call-Aufzeichnung vom {datum} – freigeben?", _email_html(imp)
+                )
+                if ok:
                     imp.notified_at = utc_now()
                     sent += 1
             except Exception as e:

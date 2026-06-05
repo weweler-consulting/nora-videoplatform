@@ -11,7 +11,6 @@ Schreibt Client-ID, Secret, Refresh-Token + Folder-ID in eine geschützte ENV-Da
 """
 import json
 import os
-import stat
 import sys
 
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -40,9 +39,11 @@ def main() -> None:
         f"export NORA_GOOGLE_OAUTH_REFRESH_TOKEN='{creds.refresh_token}'",
         f"export NORA_MEET_RECORDINGS_FOLDER_ID='{DEFAULT_FOLDER_ID}'",
     ]
-    with open(out_path, "w") as fh:
+    # Direkt mit 0600 anlegen (kein chmod-TOCTOU-Fenster mit Default-umask).
+    fd = os.open(out_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as fh:
         fh.write("\n".join(lines) + "\n")
-    os.chmod(out_path, stat.S_IRUSR | stat.S_IWUSR)  # 600
+    os.chmod(out_path, 0o600)  # falls Datei schon existierte (O_CREAT-mode greift dann nicht)
 
     if not creds.refresh_token:
         print("\n⚠️  Kein Refresh-Token erhalten — App ggf. schon autorisiert. Zugriff unter "
