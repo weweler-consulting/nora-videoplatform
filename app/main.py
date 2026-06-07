@@ -253,12 +253,32 @@ async def health():
 
 # Serve frontend static files in production
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend" / "dist"
+
+
+def _safe_static_file(base: Path, full_path: str) -> Path | None:
+    """Resolve ``full_path`` under ``base``, guarding against path traversal.
+
+    Returns the resolved file path only if it stays inside ``base`` and points
+    to an existing regular file; otherwise ``None`` (caller falls back to the
+    SPA index). Without this check, URL-encoded ``../`` (e.g. ``%2e%2e``)
+    escapes the frontend dir and exposes arbitrary process-readable files.
+    """
+    base = base.resolve()
+    try:
+        target = (base / full_path).resolve()
+    except (ValueError, OSError):
+        return None
+    if target.is_file() and target.is_relative_to(base):
+        return target
+    return None
+
+
 if FRONTEND_DIR.exists():
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="static")
 
     @app.get("/{full_path:path}")
     async def serve_frontend(request: Request, full_path: str):
-        file_path = FRONTEND_DIR / full_path
-        if file_path.exists() and file_path.is_file():
-            return FileResponse(file_path)
+        safe = _safe_static_file(FRONTEND_DIR, full_path)
+        if safe is not None:
+            return FileResponse(safe)
         return FileResponse(FRONTEND_DIR / "index.html")
