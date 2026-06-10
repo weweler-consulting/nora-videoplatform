@@ -44,8 +44,10 @@ zum Anklicken (vermeidet Tippfehler / Strich-Abweichungen). API: `GET /api/v1/li
   (`… (Dezember 2026)`) → neues Mapping. Die alten Recordings bleiben (Dedup), kommen nicht zurück.
 
 **Was die Recording-Dateien tatsächlich heißen (zur Kontrolle):**
-Google legt sie als `<Serien-Titel> - YYYY/MM/DD HH:MM <TZ> - Recording` (Video, mp4) im Ordner
-„Meet Recordings" ab. Beispiel real:
+Google legt sie als `<Serien-Titel> - YYYY/MM/DD [HH:MM <TZ>] - Recording` (Video, mp4) im Ordner
+„Meet Recordings" ab — die Uhrzeit ist dabei **optional**, die bisherigen Prod-Recordings tragen
+nur das Datum. Beispiele real:
+`Live Call | Glukose Balance - 2026/04/30 - Recording`,
 `Live Call | Glukose Balance - 2026/06/04 19:14 WEST - Recording`. Die getrennten 1:1-Calls
 (`… Coaching - Name x Nora …`, `Beratungsgespräch …`) werden durch den Prefix automatisch
 ausgeschlossen.

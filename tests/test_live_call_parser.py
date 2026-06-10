@@ -15,6 +15,17 @@ def test_parse_occurrence_at_handles_notizen_name():
     assert parse_occurrence_at(name) == datetime(2026, 5, 28, 19, 14)
 
 
+def test_parse_occurrence_at_date_only_recording():
+    # Reales Prod-Namensformat: Meet liefert oft KEINE Uhrzeit im Dateinamen.
+    name = "Live Call | Glukose Balance - 2026/04/30 - Recording"
+    assert parse_occurrence_at(name) == datetime(2026, 4, 30, 0, 0)
+
+
+def test_parse_occurrence_at_date_only_vier_wochen_kurs():
+    name = "4-Wochen Glukose Balance Code Live Call - 2026/06/10 - Recording"
+    assert parse_occurrence_at(name) == datetime(2026, 6, 10, 0, 0)
+
+
 def test_parse_occurrence_at_returns_none_without_date():
     assert parse_occurrence_at("Irgendein Dokument ohne Datum") is None
 
