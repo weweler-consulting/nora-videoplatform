@@ -30,6 +30,15 @@ export default function CheckinPlayer({
 
   useEffect(() => {
     let active = true;
+    // Beim Lektionswechsel den State der vorigen Lektion vollständig verwerfen.
+    // Sonst leakt eine zuvor geöffnete (ausgefüllte) Check-in-Antwort ins
+    // Formular der nächsten Woche: Der else-Zweig setzte nur den Modus, ließ
+    // `answers` aber auf den Vorwochen-Werten stehen → die Klientin sah Woche N-1
+    // vorausgefüllt und schickte sie versehentlich als Woche N erneut ab.
+    setMode('loading');
+    setIdx(0);
+    setAnswers({});
+    setError(null);
     Promise.all([api.getCheckinLesson(lessonId), api.getCheckinResponse(lessonId)])
       .then(([lesson, resp]) => {
         if (!active) return;

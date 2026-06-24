@@ -173,6 +173,7 @@ export default function LessonView() {
       {currentLesson.type === 'checkin' ? (
         <>
           <CheckinPlayer
+            key={currentLesson.id}
             lessonId={currentLesson.id}
             nextHref={nextLesson ? `/course/${courseId}/lesson/${nextLesson.id}` : null}
             onCompleted={async () => {
