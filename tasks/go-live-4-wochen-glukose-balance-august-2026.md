@@ -212,9 +212,34 @@ Die alte Juni-Gruppe muss auf `completed` stehen (bereits erledigt).
 
 ---
 
-## Block 3 — Testkauf (nicht überspringen)
+## Block 3 — Testkauf ✅ ERFOLGREICH (2026-07-26, 21:41)
 
-- [ ] 100 %-Coupon-Testkauf über den echten Payment Link
+- [x] 100 %-Coupon-Testkauf über den echten Payment Link (Coupon `TEST100`,
+      Testadresse `weweler+4wochenaugust@me.com`) — **komplette Kette verifiziert**
+
+```
+Stripe 495 € → TEST100 (100 %) → 0 €, AGB-Checkbox, client_reference_id gesetzt
+  → Webhook matcht beide Produkte
+  → 2 Enrollments (4-Wochen + Frühstücks-Code)  ← Bundle-Mapping bestätigt
+  → Invite-Mail: "… (Start August 2026) inkl. Frühstücks-Code ist da"
+  → /accept-invite → Passwort → Dashboard mit 2 Kacheln
+  → Danke-Seite mit echter cs_live_…-Session (kein Platzhalter)
+  → CRM: Kontakt, Stufe 3, Purchase price 0, status active
+  → Kohorte "4 Wochen Glukose Balance Code Start Aug 2026" automatisch zugewiesen
+```
+
+**Damit auch bestätigt:** `runsAsCohort = true` (Block 2, Punkt 10 — vorher ungeprüft) und
+die `product_course_map`-Zeile ist intakt.
+
+**Beim Test aufgefallen:**
+- Betreff wird im Mail-Client abgeschnitten („…inkl. Frühstücks-Code ist…") — siehe Block 3b
+- Die Stripe-Checkbox deckt nur AGB + Datenschutz ab, **nicht** den Widerrufs-Verzicht
+- Kurs zeigt „0 / 6 Lektionen" — das sind ausschließlich die sechs Check-in-Formulare,
+  die Inhaltsmodule 1–4 sind weiterhin leer
+- Aufräumen nicht vergessen: Testkontakt im CRM (sitzt sonst in der Teilnehmerliste und im
+  Umsatz-Feed) und User in der Plattform
+
+### Ursprüngliche Checkliste
 
 Muss **alles** davon zeigen:
 1. Enrollment in **beide** Kurse (4-Wochen **und** Frühstücks-Code)
@@ -349,6 +374,38 @@ Zweiter Effekt: Sind **alle** Termine vorbei, wirft der Bulk-Subscribe hart
 Zu Schritt 4: `autoSubscribeByTag` (`sequences.ts:616`) nimmt Nachzügler laufend auf und
 startet sie bei der nächsten **zukünftigen** Mail. Sind alle Termine durch, kein Subscribe mehr —
 sauberer Cutoff, nichts weiter zu tun. Greift aber nur bei Status `active`.
+
+### Vorfall 2026-07-26: Mail 1 übersprungen — Reparatur per SQL
+
+**Verlauf:** Kontakte wurden im Entwurf zugeordnet, während Mail 1 (20:30) bereits
+vorbei war → `enrollContactsInSequence` schrieb `currentStepIndex = 1` fest. Das
+nachträgliche Verschieben auf 22:30 bzw. 23:00 half nicht: `updateSequenceSteps`
+(`sequences.ts:355-390`) fasst nur den Step an, auf dem eine Sub *gerade sitzt*.
+Zusätzlich blieben nach dem Aktivieren alle 28 Subs auf `paused` — `updateSequenceStatus`
+schreibt den Sequenz-Status **vor** den Subscriptions und ist nicht transaktional.
+
+**Zwischenschritt:** „Pausieren → Aktiv" im UI hat die Subs auf `active` gebracht,
+den eingefrorenen Startindex aber nicht zurückgesetzt.
+
+**Reparatur** (Cloudron-Web-Terminal, `cd /app`, verifiziert per Vorher-/Nachher-SELECT):
+
+```
+NODE_PATH=/app/node_modules node scripts/sql.js 'UPDATE "SequenceSubscription" sub SET "currentStepIndex" = 0, "nextSendAt" = st."sendDate" FROM "Sequence" s, "SequenceStep" st WHERE sub."sequenceId" = s.id AND st."sequenceId" = s.id AND st."sortOrder" = 0 AND s.name LIKE $q$…%$q$ AND sub.status = $q$active$q$'
+```
+
+Dollar-Quoting (`$q$…$q$`) für String-Literale, damit sich Shell-Single-Quotes und die
+doppelten Quotes der PascalCase-Bezeichner nicht in die Quere kommen. Vorher immer
+prüfen, ob `sortOrder` lückenlos bei 0 beginnt — `currentStepIndex` ist die **Position**
+in der sortierten Liste, nicht der `sortOrder`-Wert.
+
+### Offene CRM-Bugs (nach dem Launch fixen)
+
+- [ ] `updateSequenceStatus` (`sequences.ts:160-206`): Sequenz-Status und Subscriptions in
+      eine Transaktion; echten Fehler durchreichen statt „Status konnte nicht geändert werden".
+      Sonst bleibt der Zustand „Kampagne aktiv, niemand bekommt Mails" unbemerkt.
+- [ ] `enrollContactsInSequence` (`sequences.ts:705-711`): Warnung im Zuordnen-Dialog, wenn
+      der erste Email-Step in der Vergangenheit liegt — aktuell verlieren die Kontakte
+      Mail 1 dauerhaft und stillschweigend.
 
 ### Kampagne B — ~2600 Kontakte
 
