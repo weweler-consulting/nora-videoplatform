@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { api, clearToken } from '../lib/api';
+import { api, clearToken, stopImpersonation } from '../lib/api';
 
 interface UserInfo {
   name: string;
   email: string;
   is_admin: boolean;
+  impersonated?: boolean;
+  impersonator?: { id: string; name: string; email: string } | null;
 }
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -36,6 +38,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const handleLogout = () => {
     clearToken();
     navigate('/login');
+  };
+
+  const handleStopImpersonation = () => {
+    stopImpersonation();
+    // Full reload back to user management with the admin token restored.
+    window.location.href = '/admin/users';
   };
 
   const closeDrawer = () => setDrawerOpen(false);
@@ -199,6 +207,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 md:overflow-auto min-w-0">
+        {user?.impersonated && (
+          <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 bg-amber-100 border-b border-amber-300 px-4 py-2.5 text-sm text-amber-900">
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <span>
+                Kundensicht: Du siehst die Plattform als <strong>{user.name}</strong>
+                {user.email ? ` (${user.email})` : ''}.
+              </span>
+            </span>
+            <button
+              onClick={handleStopImpersonation}
+              className="shrink-0 rounded-md bg-amber-900 px-3 py-1 text-xs font-medium text-white hover:bg-amber-800 transition-colors"
+            >
+              Zurück zu Admin
+            </button>
+          </div>
+        )}
         {children}
       </main>
     </div>

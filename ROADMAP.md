@@ -21,6 +21,7 @@
 - Manuelles Modul-Freischalten pro Teilnehmer (Drip-Override im User-Sheet)
 - Klickbare Navigation zurück zur Kursübersicht aus der Lektionsansicht
 - E-Mail bei Modul-Freischaltung (Drip-Benachrichtigung)
+- Einloggen aus Kundensicht (Impersonation zum Debuggen von Zugriffs-/Video-Problemen)
 
 ## Offene Features — sortiert nach Business Impact + Aufwand
 

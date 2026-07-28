@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.db import get_db
-from app.core.auth import require_admin, require_admin_or_service
+from app.core.auth import require_admin, require_admin_or_service, create_access_token
 from app.core.time import utc_now
 from app.models.user import User
 from app.models.course import Enrollment, Course, Module, Section, Lesson, LessonProgress, ModuleUnlock
@@ -152,6 +152,33 @@ async def invite_user(data: InviteRequest, request: Request, _auth=Depends(requi
         "email_sent": email_sent,
         "invite_url": invite_url,
         "pending_invite": is_pending_invite,
+    }
+
+
+@router.post("/{user_id}/impersonate")
+async def impersonate_user(user_id: str, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Issue a short-lived access token for a customer so an admin can see the
+    platform exactly as that customer does ("Login aus Kundensicht").
+
+    Used to debug reports like "video shows 404 / kein Video vorhanden" that only
+    reproduce from the affected user's perspective (drip locks, enrollment gaps,
+    published state). The token carries an `imp` claim with the admin's id so the
+    frontend can show a banner and the session can be audited.
+    """
+    result = await db.execute(select(User).where(User.id == user_id))
+    target = result.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.id == admin.id:
+        raise HTTPException(status_code=400, detail="Du bist bereits als du selbst eingeloggt.")
+    if target.is_admin:
+        raise HTTPException(status_code=400, detail="Admins können nicht aus Kundensicht angezeigt werden.")
+    logger.info(f"Admin {admin.email} ({admin.id}) impersonates {target.email} ({target.id})")
+    token = create_access_token(target.id, impersonator_id=admin.id)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {"id": target.id, "name": target.name, "email": target.email},
     }
 
 
