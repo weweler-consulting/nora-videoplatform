@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { api, type UserWithEnrollments, type CourseListItem, type UserCourseProgress } from '../../lib/api';
+import { api, startImpersonation, type UserWithEnrollments, type CourseListItem, type UserCourseProgress } from '../../lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { X, UserPlus, Trash2, ShieldCheck, ShieldOff, Copy, Check, Lock, Unlock } from 'lucide-react';
+import { X, UserPlus, Trash2, ShieldCheck, ShieldOff, Copy, Check, Lock, Unlock, Eye } from 'lucide-react';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserWithEnrollments[]>([]);
@@ -130,6 +130,17 @@ export default function AdminUsers() {
       closeSheet();
       load();
     } catch (err: any) { alert(err.message || 'Fehler beim Löschen.'); }
+  };
+
+  const handleImpersonate = async (userId: string, name: string) => {
+    try {
+      const res = await api.impersonateUser(userId);
+      startImpersonation(res.access_token);
+      // Full reload so every cached view re-fetches with the customer token.
+      window.location.href = '/';
+    } catch (err: any) {
+      alert(err.message || `Konnte nicht als ${name} einloggen.`);
+    }
   };
 
   if (loading) {
@@ -512,25 +523,40 @@ export default function AdminUsers() {
 
               {/* Footer actions */}
               {!selectedUser.is_admin && (
-                <div className="border-t px-6 py-4 flex items-center gap-2">
+                <div className="border-t px-6 py-4 space-y-3">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-xs"
-                    onClick={() => handleToggleActive(selectedUser.id)}
+                    className="w-full text-xs"
+                    disabled={!selectedUser.is_active}
+                    title={selectedUser.is_active
+                      ? 'Die Plattform genau so sehen wie diese Teilnehmerin — zum Debuggen von Video-/Zugriffsproblemen.'
+                      : 'Inaktive Teilnehmer können nicht aus Kundensicht angezeigt werden.'}
+                    onClick={() => handleImpersonate(selectedUser.id, selectedUser.name)}
                   >
-                    {selectedUser.is_active ? <ShieldOff className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-                    {selectedUser.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                    <Eye className="h-3.5 w-3.5" />
+                    Aus Kundensicht einloggen
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => handleDeleteUser(selectedUser.id, selectedUser.name)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Löschen
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => handleToggleActive(selectedUser.id)}
+                    >
+                      {selectedUser.is_active ? <ShieldOff className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                      {selectedUser.is_active ? 'Deaktivieren' : 'Aktivieren'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDeleteUser(selectedUser.id, selectedUser.name)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Löschen
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

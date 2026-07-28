@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -17,11 +19,21 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class ImpersonatorInfo(BaseModel):
+    id: str
+    name: str
+    email: str
+
+
 class UserResponse(BaseModel):
     id: str
     email: str
     name: str
     is_admin: bool
+    # Set when the current session is an admin viewing the platform "aus
+    # Kundensicht". `impersonator` describes the admin behind the session.
+    impersonated: bool = False
+    impersonator: Optional[ImpersonatorInfo] = None
 
 
 class InviteInfoResponse(BaseModel):

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -15,7 +16,9 @@ from app.core.auth import (
     create_access_token,
     create_email_change_token,
     decode_email_change_token,
+    decode_token_payload,
     get_current_user,
+    security,
 )
 from app.core.email import send_invite_email, send_password_reset_email, send_email_change_verification
 from app.core.ratelimit import limiter
@@ -30,6 +33,7 @@ from app.schemas.auth import (
     InviteInfoResponse,
     AcceptInviteRequest,
     ConfirmEmailChangeRequest,
+    ImpersonatorInfo,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,8 +69,27 @@ async def register(request: Request, data: RegisterRequest, db: AsyncSession = D
 
 
 @router.get("/me", response_model=UserResponse)
-async def me(user: User = Depends(get_current_user)):
-    return UserResponse(id=user.id, email=user.email, name=user.name, is_admin=user.is_admin)
+async def me(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    impersonator: Optional[ImpersonatorInfo] = None
+    payload = decode_token_payload(credentials.credentials) or {}
+    imp_id = payload.get("imp")
+    if imp_id:
+        result = await db.execute(select(User).where(User.id == imp_id))
+        admin = result.scalar_one_or_none()
+        if admin:
+            impersonator = ImpersonatorInfo(id=admin.id, name=admin.name, email=admin.email)
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        is_admin=user.is_admin,
+        impersonated=impersonator is not None,
+        impersonator=impersonator,
+    )
 
 
 class ChangePasswordRequest(BaseModel):

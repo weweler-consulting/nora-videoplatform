@@ -34,9 +34,18 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return hmac.compare_digest(h.hex(), hash_hex)
 
 
-def create_access_token(user_id: str) -> str:
-    expire = utc_now() + timedelta(minutes=settings.access_token_expire_minutes)
-    payload = {"sub": user_id, "exp": expire}
+# Impersonation ("Login aus Kundensicht") sessions are short-lived so an admin
+# who forgets to switch back doesn't leave a customer-scoped token lying around.
+IMPERSONATION_TOKEN_EXPIRE_MINUTES = 60
+
+
+def create_access_token(user_id: str, impersonator_id: Optional[str] = None) -> str:
+    if impersonator_id:
+        expire = utc_now() + timedelta(minutes=IMPERSONATION_TOKEN_EXPIRE_MINUTES)
+        payload = {"sub": user_id, "exp": expire, "imp": impersonator_id}
+    else:
+        expire = utc_now() + timedelta(minutes=settings.access_token_expire_minutes)
+        payload = {"sub": user_id, "exp": expire}
     return jwt.encode(payload, settings.secret_key, algorithm="HS256")
 
 
@@ -44,6 +53,18 @@ def decode_access_token(token: str) -> Optional[str]:
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
         return payload.get("sub")
+    except jwt.PyJWTError:
+        return None
+
+
+def decode_token_payload(token: str) -> Optional[dict]:
+    """Return the full decoded JWT payload (or None if invalid/expired).
+
+    Used to surface impersonation context (`imp` claim) that the plain
+    `decode_access_token` helper drops.
+    """
+    try:
+        return jwt.decode(token, settings.secret_key, algorithms=["HS256"])
     except jwt.PyJWTError:
         return None
 

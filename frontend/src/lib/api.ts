@@ -1,5 +1,9 @@
 const API_BASE = '/api/v1';
 
+// While impersonating a customer ("Login aus Kundensicht"), the admin's own
+// token is parked here so we can switch back without a fresh login.
+const ADMIN_TOKEN_KEY = 'admin_token';
+
 function getToken(): string | null {
   return localStorage.getItem('token');
 }
@@ -10,10 +14,31 @@ export function setToken(token: string) {
 
 export function clearToken() {
   localStorage.removeItem('token');
+  localStorage.removeItem(ADMIN_TOKEN_KEY);
 }
 
 export function isLoggedIn(): boolean {
   return !!getToken();
+}
+
+/** Park the current admin token and switch the session to the customer token. */
+export function startImpersonation(customerToken: string) {
+  const current = getToken();
+  if (current) localStorage.setItem(ADMIN_TOKEN_KEY, current);
+  setToken(customerToken);
+}
+
+/** Restore the parked admin token. Returns false if no impersonation was active. */
+export function stopImpersonation(): boolean {
+  const adminToken = localStorage.getItem(ADMIN_TOKEN_KEY);
+  if (!adminToken) return false;
+  setToken(adminToken);
+  localStorage.removeItem(ADMIN_TOKEN_KEY);
+  return true;
+}
+
+export function isImpersonating(): boolean {
+  return !!localStorage.getItem(ADMIN_TOKEN_KEY);
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -64,7 +89,11 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
-  me: () => request<{ id: string; email: string; name: string; is_admin: boolean }>('/auth/me'),
+  me: () => request<{
+    id: string; email: string; name: string; is_admin: boolean;
+    impersonated?: boolean;
+    impersonator?: { id: string; name: string; email: string } | null;
+  }>('/auth/me'),
 
   changePassword: (currentPassword: string, newPassword: string) =>
     request('/auth/password', {
@@ -160,6 +189,9 @@ export const api = {
     request<{ user_id: string; email_sent: boolean; invite_url: string | null; pending_invite: boolean }>('/users/invite', { method: 'POST', body: JSON.stringify(data) }),
   toggleUserActive: (userId: string) =>
     request<{ is_active: boolean }>('/users/' + userId + '/toggle-active', { method: 'PUT' }),
+  impersonateUser: (userId: string) =>
+    request<{ access_token: string; user: { id: string; name: string; email: string } }>(
+      '/users/' + userId + '/impersonate', { method: 'POST' }),
   enrollUser: (userId: string, courseId: string) =>
     request('/users/' + userId + '/enroll', { method: 'POST', body: JSON.stringify({ course_id: courseId }) }),
   removeEnrollment: (enrollmentId: string) =>
