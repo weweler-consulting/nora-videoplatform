@@ -12,7 +12,7 @@ Eine Liste. Hier weitermachen, wenn du Zeit hast. Erledigte Punkte abhaken, nich
 
 ## 📍 Hier morgen weitermachen
 
-**Plattform-Stand:** Live auf `kose.noraweweler.de`. Go-Live-Audit durch. CRM-Anbindung an `crm.noraweweler.de` live, inkl. Status-Sync. Mitgliederbereich-Feature (Hub pro Kurs) seit 2026-04-24 deployed. **2026-04-27 abends: erste zahlende Kundinnen eingeladen.** Nächster Brocken: **B2 Zertifikat** — sobald die erste Kohorte stabil läuft.
+**Plattform-Stand:** Live auf `kurse.noraweweler.de`. Go-Live-Audit durch. CRM-Anbindung an `crm.noraweweler.de` live, inkl. Status-Sync. Mitgliederbereich-Feature (Hub pro Kurs) seit 2026-04-24 deployed. **2026-04-27 abends: erste zahlende Kundinnen eingeladen.** Nächster Brocken: **B2 Zertifikat** — sobald die erste Kohorte stabil läuft.
 
 **Erstes Cohort-Monitoring (24–48h):**
 - Resend-Dashboard: Bounces / Spam-Reports der Invite-Mails prüfen
