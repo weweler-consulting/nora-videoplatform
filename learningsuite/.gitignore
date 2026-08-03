@@ -1,0 +1,6 @@
+auth.json
+export/
+package-lock.json
+graphql-recording.jsonl
+*.jsonl
+work-list.json

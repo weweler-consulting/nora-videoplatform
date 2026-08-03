@@ -1,0 +1,17 @@
+{
+  "name": "ls-export",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Migrations-Tool: Videos + Inhalte aus LearningSuite exportieren bevor Vertrag endet (16.05.2026)",
+  "bin": {
+    "ls-export": "./ls-export.mjs"
+  },
+  "scripts": {
+    "login": "node ls-export.mjs login",
+    "download": "node ls-export.mjs download"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}
