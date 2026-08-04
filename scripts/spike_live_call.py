@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.core.config import settings
 from app.core.live_call_parser import occurrence_from_drive_file
 from app.integrations.google_drive import (
-    list_video_files, download_to_file, _service, _meet_root_folder_id, _folder_tree_ids,
+    list_video_files, download_to_file, _service, search_root_ids, _folder_tree_ids,
 )
 
 PREFIX = "Live Call | Glukose Balance"  # für den Spike fest; in Phase 2 aus dem Mapping
@@ -33,10 +33,11 @@ def cmd_list(prefix: str = PREFIX, days: int = 60) -> None:
     # Zeigt, wo tatsächlich gesucht wird — seit Googles Drive-Umbau (Juli 2026) ist
     # das i.d.R. der Elternordner „Google Meet" samt aller Meeting-Unterordner.
     svc = _service()
-    root = _meet_root_folder_id(svc, folder)
-    tree = _folder_tree_ids(svc, root)
+    roots = search_root_ids(svc, folder)
+    tree = _folder_tree_ids(svc, roots)
     print(f"Konfigurierter Ordner: {folder}")
-    print(f"Suchwurzel:            {root}{'  (= konfigurierter Ordner)' if root == folder else '  (Elternordner Google Meet)'}")
+    print(f"Suchwurzeln:           {', '.join(roots)}"
+          f"{'  (kein Google-Meet-Ordner gefunden!)' if len(roots) == 1 else ''}")
     print(f"Ordnerbaum:            {len(tree)} Ordner, Videos geändert nach {since}\n")
 
     files = list_video_files(folder, prefix, since)

@@ -39,34 +39,34 @@ _MAX_FOLDERS = 300         # Reißleine, falls je auf einen riesigen Baum gezeig
 _PARENTS_PER_QUERY = 25    # Drive-Query nicht unbegrenzt lang werden lassen
 
 
-def _meet_root_folder_id(svc, folder_id: str) -> str:
-    """Suchwurzel bestimmen.
+def search_root_ids(svc, folder_id: str) -> list[str]:
+    """Suchwurzeln bestimmen: konfigurierter Ordner + der Ordner „Google Meet".
 
     Seit Googles Drive-Umbau (Rapid Release 22.07.2026 / Scheduled 30.07.2026) legt
-    Meet Aufzeichnungen in `Google Meet/<Meeting>/` ab und hat den alten Ordner
-    `Meet Recordings` dort HINEIN verschoben + in `Legacy Meet Recordings` umbenannt.
-    Die Ordner-ID blieb dabei gleich — der konfigurierte Ordner zeigt also weiter auf
-    das Archiv, in dem nie wieder etwas Neues landet.
+    Meet Aufzeichnungen in `Google Meet/<Meeting>/` ab; der alte Ordner `Meet Recordings`
+    wird dorthin verschoben und in `Legacy Meet Recordings` umbenannt — laut Google
+    existieren beide während der Umstellung aber eine Weile NEBENEINANDER. Genau dieser
+    Zustand liegt bei Nora vor: die Historie liegt weiter im konfigurierten Ordner, neue
+    Aufzeichnungen ausschließlich unter `Google Meet`.
 
-    Hängt der konfigurierte Ordner unter `Google Meet`, suchen wir deshalb ab DORT
-    (deckt Alt-Archiv und alle neuen Meeting-Unterordner ab). Sonst — Zustand vor der
-    Migration — bleibt der konfigurierte Ordner die Wurzel. Bewusst am Elternnamen
-    festgemacht, damit wir nie versehentlich ab „Meine Ablage" das ganze Drive scannen.
+    Deshalb immer beide Wurzeln durchsuchen. Der Meet-Ordner wird über den exakten Namen
+    in „Meine Ablage" aufgelöst — nie über die Wurzel selbst, sonst würden wir das ganze
+    Drive scannen. Findet sich keiner, bleibt es beim konfigurierten Ordner.
     """
+    roots = [folder_id]
     try:
-        meta = svc.files().get(fileId=folder_id, fields="parents", supportsAllDrives=True).execute()
-        for parent_id in meta.get("parents") or []:
-            p = svc.files().get(fileId=parent_id, fields="id,name,mimeType", supportsAllDrives=True).execute()
-            if p.get("name") == _MEET_ROOT_FOLDER_NAME and p.get("mimeType") == _FOLDER_MIME:
-                return p["id"]
-    except Exception as e:  # Auflösung ist Kür — im Zweifel wie bisher weitersuchen
-        logger.warning(f"Drive: Meet-Wurzelordner nicht auflösbar ({folder_id}): {e}")
-    return folder_id
+        q = (f"'root' in parents and trashed = false and mimeType = '{_FOLDER_MIME}' "
+             f"and name = '{_MEET_ROOT_FOLDER_NAME}'")
+        roots.extend(f["id"] for f in _list_all(svc, q, "id") if f["id"] != folder_id)
+    except Exception as e:  # Auflösung ist Kür — im Zweifel wie bisher nur der Ordner
+        logger.warning(f"Drive: Ordner „{_MEET_ROOT_FOLDER_NAME}\" nicht auflösbar: {e}")
+    return roots
 
 
-def _folder_tree_ids(svc, root_id: str) -> list[str]:
-    """Wurzel + alle Unterordner (breadth-first, tiefen-/mengenbegrenzt)."""
-    ids, frontier = [root_id], [root_id]
+def _folder_tree_ids(svc, root_ids: list[str]) -> list[str]:
+    """Wurzeln + alle Unterordner (breadth-first, tiefen-/mengenbegrenzt)."""
+    ids = list(dict.fromkeys(root_ids))
+    frontier = list(ids)
     for _ in range(_MAX_FOLDER_DEPTH):
         children: list[str] = []
         for chunk in _chunks(frontier, _PARENTS_PER_QUERY):
@@ -112,7 +112,7 @@ def list_video_files(folder_id: str, name_prefix: str, modified_after_iso: str) 
     Gibt [{id,name,mimeType,size,modifiedTime,createdTime}]. Echten Prefix clientseitig
     prüfen, da Drive 'name contains' nur als Teilstring kann."""
     svc = _service()
-    folders = _folder_tree_ids(svc, _meet_root_folder_id(svc, folder_id))
+    folders = _folder_tree_ids(svc, search_root_ids(svc, folder_id))
     files: dict[str, dict] = {}
     for chunk in _chunks(folders, _PARENTS_PER_QUERY):
         q = (
