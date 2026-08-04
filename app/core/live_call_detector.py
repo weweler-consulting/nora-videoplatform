@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.core import db as db_module
 from app.core.config import settings
-from app.core.live_call_parser import parse_occurrence_at, is_group_recording
+from app.core.live_call_parser import occurrence_from_drive_file, is_group_recording
 from app.integrations.google_drive import list_video_files
 from app.models.live_call import LiveCallSeries, LiveCallImport
 
@@ -44,7 +44,7 @@ async def detect_new_recordings() -> int:
                     continue
                 db.add(LiveCallImport(
                     series_id=series.id, drive_file_id=fid, recording_name=f["name"],
-                    occurrence_at=parse_occurrence_at(f["name"]), status="new",
+                    occurrence_at=occurrence_from_drive_file(f), status="new",
                 ))
                 known.add(fid)
                 created += 1

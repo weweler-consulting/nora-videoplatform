@@ -32,29 +32,97 @@ def _service():
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
-def list_video_files(folder_id: str, name_prefix: str, modified_after_iso: str) -> list[dict]:
-    """Video-Dateien im Ordner mit Name-Prefix, geändert nach modified_after_iso.
-    Gibt [{id,name,mimeType,size,modifiedTime}]. Echten Prefix clientseitig prüfen,
-    da Drives 'name contains' nur Teilstring kann."""
-    svc = _service()
-    q = (
-        f"'{folder_id}' in parents and trashed = false "
-        f"and mimeType contains 'video/' "
-        f"and modifiedTime > '{modified_after_iso}'"
-    )
-    files, page_token = [], None
+_FOLDER_MIME = "application/vnd.google-apps.folder"
+_MEET_ROOT_FOLDER_NAME = "Google Meet"
+_MAX_FOLDER_DEPTH = 3      # Google Meet/<Meeting>/ braucht 1; Puffer für Verschachtelung
+_MAX_FOLDERS = 300         # Reißleine, falls je auf einen riesigen Baum gezeigt wird
+_PARENTS_PER_QUERY = 25    # Drive-Query nicht unbegrenzt lang werden lassen
+
+
+def _meet_root_folder_id(svc, folder_id: str) -> str:
+    """Suchwurzel bestimmen.
+
+    Seit Googles Drive-Umbau (Rapid Release 22.07.2026 / Scheduled 30.07.2026) legt
+    Meet Aufzeichnungen in `Google Meet/<Meeting>/` ab und hat den alten Ordner
+    `Meet Recordings` dort HINEIN verschoben + in `Legacy Meet Recordings` umbenannt.
+    Die Ordner-ID blieb dabei gleich — der konfigurierte Ordner zeigt also weiter auf
+    das Archiv, in dem nie wieder etwas Neues landet.
+
+    Hängt der konfigurierte Ordner unter `Google Meet`, suchen wir deshalb ab DORT
+    (deckt Alt-Archiv und alle neuen Meeting-Unterordner ab). Sonst — Zustand vor der
+    Migration — bleibt der konfigurierte Ordner die Wurzel. Bewusst am Elternnamen
+    festgemacht, damit wir nie versehentlich ab „Meine Ablage" das ganze Drive scannen.
+    """
+    try:
+        meta = svc.files().get(fileId=folder_id, fields="parents", supportsAllDrives=True).execute()
+        for parent_id in meta.get("parents") or []:
+            p = svc.files().get(fileId=parent_id, fields="id,name,mimeType", supportsAllDrives=True).execute()
+            if p.get("name") == _MEET_ROOT_FOLDER_NAME and p.get("mimeType") == _FOLDER_MIME:
+                return p["id"]
+    except Exception as e:  # Auflösung ist Kür — im Zweifel wie bisher weitersuchen
+        logger.warning(f"Drive: Meet-Wurzelordner nicht auflösbar ({folder_id}): {e}")
+    return folder_id
+
+
+def _folder_tree_ids(svc, root_id: str) -> list[str]:
+    """Wurzel + alle Unterordner (breadth-first, tiefen-/mengenbegrenzt)."""
+    ids, frontier = [root_id], [root_id]
+    for _ in range(_MAX_FOLDER_DEPTH):
+        children: list[str] = []
+        for chunk in _chunks(frontier, _PARENTS_PER_QUERY):
+            q = f"({_parents_clause(chunk)}) and trashed = false and mimeType = '{_FOLDER_MIME}'"
+            children.extend(f["id"] for f in _list_all(svc, q, "id"))
+        frontier = [fid for fid in dict.fromkeys(children) if fid not in ids]
+        if not frontier:
+            break
+        ids.extend(frontier)
+        if len(ids) >= _MAX_FOLDERS:
+            logger.warning(f"Drive: Ordner-Limit {_MAX_FOLDERS} erreicht, Baum abgeschnitten")
+            return ids[:_MAX_FOLDERS]
+    return ids
+
+
+def _chunks(items: list[str], size: int):
+    for i in range(0, len(items), size):
+        yield items[i:i + size]
+
+
+def _parents_clause(folder_ids: list[str]) -> str:
+    return " or ".join(f"'{fid}' in parents" for fid in folder_ids)
+
+
+def _list_all(svc, q: str, file_fields: str) -> list[dict]:
+    """files.list mit Paging bis zum Ende."""
+    out, page_token = [], None
     while True:
         resp = svc.files().list(
             q=q,
-            fields="nextPageToken, files(id,name,mimeType,size,modifiedTime)",
+            fields=f"nextPageToken, files({file_fields})",
             pageSize=100, pageToken=page_token,
             supportsAllDrives=True, includeItemsFromAllDrives=True,
         ).execute()
-        files.extend(resp.get("files", []))
+        out.extend(resp.get("files", []))
         page_token = resp.get("nextPageToken")
         if not page_token:
-            break
-    return [f for f in files if f["name"].startswith(name_prefix)]
+            return out
+
+
+def list_video_files(folder_id: str, name_prefix: str, modified_after_iso: str) -> list[dict]:
+    """Video-Dateien im Ordnerbaum mit Name-Prefix, geändert nach modified_after_iso.
+    Gibt [{id,name,mimeType,size,modifiedTime,createdTime}]. Echten Prefix clientseitig
+    prüfen, da Drive 'name contains' nur als Teilstring kann."""
+    svc = _service()
+    folders = _folder_tree_ids(svc, _meet_root_folder_id(svc, folder_id))
+    files: dict[str, dict] = {}
+    for chunk in _chunks(folders, _PARENTS_PER_QUERY):
+        q = (
+            f"({_parents_clause(chunk)}) and trashed = false "
+            f"and mimeType contains 'video/' "
+            f"and modifiedTime > '{modified_after_iso}'"
+        )
+        for f in _list_all(svc, q, "id,name,mimeType,size,modifiedTime,createdTime"):
+            files[f["id"]] = f
+    return [f for f in files.values() if f["name"].startswith(name_prefix)]
 
 
 def download_to_file(file_id: str, dest_path: str) -> None:

@@ -29,7 +29,7 @@ from app.models.user import User
 
 router = APIRouter()
 
-_PREFIX_SPLIT = re.compile(r"\s*-\s*\d{4}/\d{2}/\d{2}\s")  # alles vor " - YYYY/MM/DD "
+_PREFIX_SPLIT = re.compile(r"\s*-\s*\d{4}[/-]\d{2}[/-]\d{2}\b")  # alles vor " - YYYY/MM/DD "
 
 
 class SeriesCreate(BaseModel):

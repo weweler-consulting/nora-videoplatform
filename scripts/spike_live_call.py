@@ -18,19 +18,31 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.config import settings
-from app.core.live_call_parser import parse_occurrence_at
-from app.integrations.google_drive import list_video_files, download_to_file
+from app.core.live_call_parser import occurrence_from_drive_file
+from app.integrations.google_drive import (
+    list_video_files, download_to_file, _service, _meet_root_folder_id, _folder_tree_ids,
+)
 
 PREFIX = "Live Call | Glukose Balance"  # für den Spike fest; in Phase 2 aus dem Mapping
 
 
-def cmd_list() -> None:
+def cmd_list(prefix: str = PREFIX, days: int = 60) -> None:
     folder = settings.meet_recordings_folder_id
-    since = (datetime.now(timezone.utc) - timedelta(days=60)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    files = list_video_files(folder, PREFIX, since)
-    print(f"{len(files)} Video-Datei(en) mit Prefix '{PREFIX}':")
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Zeigt, wo tatsächlich gesucht wird — seit Googles Drive-Umbau (Juli 2026) ist
+    # das i.d.R. der Elternordner „Google Meet" samt aller Meeting-Unterordner.
+    svc = _service()
+    root = _meet_root_folder_id(svc, folder)
+    tree = _folder_tree_ids(svc, root)
+    print(f"Konfigurierter Ordner: {folder}")
+    print(f"Suchwurzel:            {root}{'  (= konfigurierter Ordner)' if root == folder else '  (Elternordner Google Meet)'}")
+    print(f"Ordnerbaum:            {len(tree)} Ordner, Videos geändert nach {since}\n")
+
+    files = list_video_files(folder, prefix, since)
+    print(f"{len(files)} Video-Datei(en) mit Prefix '{prefix}':")
     for f in files:
-        occ = parse_occurrence_at(f["name"])
+        occ = occurrence_from_drive_file(f)
         size_mb = int(f.get("size", 0)) / 1e6
         print(f"  - {f['name']}")
         print(f"      id={f['id']}  mime={f['mimeType']}  {size_mb:.1f} MB  occurrence={occ}")
@@ -51,10 +63,12 @@ def cmd_download(file_id: str) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--list", action="store_true")
+    ap.add_argument("--prefix", default=PREFIX, help="Name-Prefix; leer = alle Videos zeigen")
+    ap.add_argument("--days", type=int, default=60)
     ap.add_argument("--download", metavar="FILE_ID")
     args = ap.parse_args()
     if args.list:
-        cmd_list()
+        cmd_list(args.prefix, args.days)
     elif args.download:
         cmd_download(args.download)
     else:
