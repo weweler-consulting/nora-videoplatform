@@ -56,3 +56,19 @@ richtig, die tatsächliche Datenlage aber ungeprüft.
 Lücke benennen, statt sie zu überspielen. Wenn der Zugriff fehlt: den fertigen read-only
 Befehl mitliefern, damit der Check nachgeholt werden kann. Verifikationswege stehen in
 `reference_cloudron_env_management` (Memory) — `scripts/sql.py` bzw. `scripts/sql.js`.
+
+---
+
+## Fremdsystem-Umbauten: den dokumentierten Endzustand nicht als Ist-Zustand annehmen
+
+**Wann (2026-08-04, Live-Call-Import):** Googles Blogpost zum Drive-Umbau beschreibt, dass der
+alte Ordner `Meet Recordings` nach `Google Meet/` verschoben und umbenannt wird. Fix darauf
+gebaut (Suchwurzel = Elternordner, falls er „Google Meet" heisst) — bei Nora lag der alte
+Ordner aber noch DANEBEN. Google migriert schrittweise, der Blogpost sagt das sogar in einem
+Nebensatz („beide koennen voruebergehend erscheinen"). Kostete einen kompletten Deploy-Zyklus.
+
+**Regel:** Bei Aenderungen an Fremdsystemen den Fix so bauen, dass er ALLE Zwischenzustaende
+abdeckt (hier: beide Ordner immer durchsuchen), nicht nur den dokumentierten Endzustand.
+Migrationen laufen tage- bis wochenlang und pro Account unterschiedlich. Und: bevor man auf
+eine unbewiesene Annahme ueber fremde Daten deployt, erst den einen Befehl bauen, der sie
+prueft — hier haette `spike_live_call.py --list` die falsche Wurzel sofort gezeigt.
