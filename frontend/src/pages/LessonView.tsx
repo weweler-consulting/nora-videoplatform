@@ -14,11 +14,30 @@ function withPlayerParams(rawUrl: string): string {
   return `${url}${sep}playsinline=true&preload=true&responsive=true`;
 }
 
+// "11474 KB" sagt niemandem etwas — ab einem Megabyte in MB und mit deutschem
+// Dezimalkomma anzeigen.
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
+  }
+  return `${Math.round(bytes / 1024)} KB`;
+}
+
+function fileTypeLabel(filename: string): string {
+  const ext = filename.split('.').pop();
+  return ext && ext !== filename ? ext.toUpperCase() : 'Datei';
+}
+
 export default function LessonView() {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+  // Anhaenge zusammen mit ihrer lessonId halten: sonst zeigt die neue Lektion
+  // beim Wechsel kurz die Anhaenge der vorigen, bis der Request zurueck ist.
+  const [attachmentState, setAttachmentState] = useState<{
+    lessonId: string;
+    items: AttachmentItem[];
+  } | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,9 +47,20 @@ export default function LessonView() {
   }, [courseId]);
 
   useEffect(() => {
-    if (lessonId) {
-      api.getAttachments(lessonId).then(setAttachments).catch(console.error);
-    }
+    if (!lessonId) return;
+    let cancelled = false;
+    api
+      .getAttachments(lessonId)
+      .then((items) => {
+        if (!cancelled) setAttachmentState({ lessonId, items });
+      })
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) setAttachmentState({ lessonId, items: [] });
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [lessonId]);
 
   // Find current lesson and compute prev/next
@@ -50,6 +80,19 @@ export default function LessonView() {
 
   const prevLesson = currentIndex > 0 ? allLessons[currentIndex - 1] : null;
   const nextLesson = currentIndex < allLessons.length - 1 ? allLessons[currentIndex + 1] : null;
+
+  const attachments =
+    attachmentState && attachmentState.lessonId === lessonId ? attachmentState.items : [];
+  const attachmentsLoaded = attachmentState?.lessonId === lessonId;
+
+  // Eine Lektion ohne Video ist meistens kein Mangel, sondern eine
+  // Download-Lektion. Dann traegt der Anhang die Seite und wird gross gezeigt.
+  const isDownloadLesson = !currentLesson?.video_url && attachments.length > 0;
+  const isEmptyLesson =
+    attachmentsLoaded &&
+    !currentLesson?.video_url &&
+    !currentLesson?.description &&
+    attachments.length === 0;
 
   const handleToggleComplete = async () => {
     if (!currentLesson || !courseId) return;
@@ -196,7 +239,7 @@ export default function LessonView() {
       {/* Video player — playsinline=true is required so iOS Safari plays the
           video inline instead of trying to enter native fullscreen, which fails
           inside the iframe and leaves the frame black. */}
-      {currentLesson.video_url ? (
+      {currentLesson.video_url && (
         <div className="aspect-video bg-black rounded-2xl mb-4 md:mb-6">
           <iframe
             src={withPlayerParams(currentLesson.video_url)}
@@ -207,10 +250,6 @@ export default function LessonView() {
             allowFullScreen
           />
         </div>
-      ) : (
-        <div className="aspect-video bg-gray-100 rounded-2xl flex items-center justify-center mb-4 md:mb-6 text-gray-400">
-          Kein Video vorhanden
-        </div>
       )}
 
       {/* Description */}
@@ -220,8 +259,40 @@ export default function LessonView() {
         </div>
       )}
 
-      {/* Downloads */}
-      {attachments.length > 0 && (
+      {/* Downloads. Ohne Video ist der Anhang der Inhalt der Lektion und wird
+          gross dargestellt — mit Video bleibt er die kompakte Beigabe. */}
+      {attachments.length > 0 && (isDownloadLesson ? (
+        <div className="space-y-3 mb-4 md:mb-6">
+          {attachments.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => handleDownloadAttachment(a.id, a.original_filename)}
+              className="w-full text-left flex items-center gap-4 md:gap-5 p-5 md:p-6 bg-white border border-gray-100 rounded-2xl hover:border-[var(--nora-pink)] hover:shadow-sm transition-all group"
+            >
+              <span className="shrink-0 w-14 h-14 md:w-16 md:h-16 bg-[var(--nora-pink-light)] rounded-2xl flex items-center justify-center">
+                <svg className="w-7 h-7 md:w-8 md:h-8 text-[var(--nora-pink-dark)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-base md:text-lg font-semibold text-gray-800 truncate">
+                  {a.original_filename}
+                </span>
+                <span className="block text-xs md:text-sm text-gray-500 mt-1">
+                  {fileTypeLabel(a.original_filename)} &middot; {formatFileSize(a.file_size)}
+                </span>
+              </span>
+              <span className="shrink-0 flex items-center gap-2 px-3 py-3 md:px-5 rounded-xl bg-[var(--nora-pink-light)] text-[var(--nora-pink-dark)] text-sm font-medium group-hover:bg-[var(--nora-pink)] group-hover:text-white transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span className="hidden sm:inline">Herunterladen</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
         <div className="bg-white rounded-2xl p-4 md:p-6 mb-4 md:mb-6">
           <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -241,10 +312,18 @@ export default function LessonView() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
                 <span className="text-sm text-gray-700 group-hover:text-[var(--nora-pink-dark)] flex-1">{a.original_filename}</span>
-                <span className="text-xs text-gray-400">{(a.file_size / 1024).toFixed(0)} KB</span>
+                <span className="text-xs text-gray-400">{formatFileSize(a.file_size)}</span>
               </button>
             ))}
           </div>
+        </div>
+      ))}
+
+      {/* Wirklich leere Lektion: kein Video, kein Text, kein Anhang. Lieber ein
+          ehrlicher Satz als eine Seite, die nur aus Buttons besteht. */}
+      {isEmptyLesson && (
+        <div className="bg-white rounded-2xl p-6 md:p-8 mb-4 md:mb-6 text-center text-sm text-gray-500">
+          Für diese Lektion sind noch keine Inhalte hinterlegt.
         </div>
       )}
 
