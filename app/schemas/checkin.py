@@ -40,6 +40,7 @@ class CheckinModuleCreate(BaseModel):
     template_typ: str  # 'start' | 'laufend' | 'ende'
     title: Optional[str] = None
     week_index: Optional[int] = None
+    is_published: bool = False  # wie ModuleCreate: neu = Entwurf
 
 
 class StepOverride(BaseModel):

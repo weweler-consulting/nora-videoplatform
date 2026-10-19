@@ -21,7 +21,7 @@ async def _require_enrollment_for_lesson(db: AsyncSession, user: User, lesson_id
         .join(Module, Module.course_id == Enrollment.course_id)
         .join(Section, Section.module_id == Module.id)
         .join(Lesson, Lesson.section_id == Section.id)
-        .where(Lesson.id == lesson_id, Enrollment.user_id == user.id)
+        .where(Lesson.id == lesson_id, Enrollment.user_id == user.id, Module.is_published == True)
     )
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=403, detail="Not enrolled")

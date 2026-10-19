@@ -39,6 +39,16 @@ async def _require_course(db: AsyncSession, course_id: str) -> Course:
     return course
 
 
+def _require_live(module: Module) -> None:
+    """Ankündigung für ein Entwurfs-Modul würde Kundinnen auf Inhalte schicken,
+    die sie gar nicht sehen."""
+    if not module.is_published:
+        raise HTTPException(
+            status_code=422,
+            detail="Modul ist noch ein Entwurf – erst live schalten, dann ankündigen",
+        )
+
+
 async def _resolve_target(
     db: AsyncSession,
     course_id: str,
@@ -60,6 +70,7 @@ async def _resolve_target(
                 status_code=422,
                 detail="Modul gehört nicht zu diesem Kurs oder existiert nicht",
             )
+        _require_live(module)
         cta = f"{PLATFORM_BASE_URL}/course/{course_id}"
         return module.title, None, cta
 
@@ -77,6 +88,7 @@ async def _resolve_target(
                 detail="Lektion gehört nicht zu diesem Kurs oder existiert nicht",
             )
         lesson, _section, module = row
+        _require_live(module)
         cta = f"{PLATFORM_BASE_URL}/course/{course_id}/lesson/{lesson.id}"
         return lesson.title, module.title, cta
 

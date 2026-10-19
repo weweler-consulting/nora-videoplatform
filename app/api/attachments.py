@@ -80,7 +80,7 @@ async def download_attachment(
             .join(Module, Module.course_id == Enrollment.course_id)
             .join(Section, Section.module_id == Module.id)
             .join(Lesson, Lesson.section_id == Section.id)
-            .where(Lesson.id == attachment.lesson_id, Enrollment.user_id == user.id)
+            .where(Lesson.id == attachment.lesson_id, Enrollment.user_id == user.id, Module.is_published == True)
         )
         if not enrolled.scalar_one_or_none():
             raise HTTPException(status_code=403, detail="Not enrolled")

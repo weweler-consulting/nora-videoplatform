@@ -67,6 +67,8 @@ def _build_migration_statements() -> list[str]:
         "ALTER TABLE lessons ADD COLUMN checkin_template_id VARCHAR",
         "ALTER TABLE lessons ADD COLUMN checkin_overrides JSON",
         "ALTER TABLE lessons ADD COLUMN is_published BOOLEAN DEFAULT TRUE NOT NULL",
+        # Modul-Entwurf/Live: bestehende Module bleiben live.
+        "ALTER TABLE modules ADD COLUMN is_published BOOLEAN DEFAULT TRUE NOT NULL",
     ]
     # Re-create FK constraints with ON DELETE CASCADE (A3 from audit)
     for child, col, parent in _FK_CASCADES:

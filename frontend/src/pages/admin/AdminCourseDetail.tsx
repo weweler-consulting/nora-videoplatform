@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Megaphone, ClipboardList, ChevronUp, ChevronDown } from 'lucide-react';
 import { api, type CourseDetail, type ModuleItem, type LiveCallSeriesInfo } from '../../lib/api';
+import { ModuleStatusBadge, ModulePublishButton } from '../../components/ModulePublishControls';
 
 export default function AdminCourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -295,6 +296,11 @@ export default function AdminCourseDetail() {
         </div>
       ) : (
         <div className="space-y-3">
+          {course.modules.some((m) => !m.is_published) && (
+            <p className="text-sm text-gray-500">
+              Neue Module starten als <strong>Entwurf</strong> und sind nur für dich sichtbar. Mit „Live schalten" gibst du sie für alle Kundinnen frei.
+            </p>
+          )}
           {course.modules.map((module, idx) => {
             const lessonCount = module.sections.reduce((sum, s) => sum + s.lessons.length, 0);
             const hasHidden = module.sections.some((s) => s.lessons.some((l) => l.is_published === false));
@@ -336,6 +342,7 @@ export default function AdminCourseDetail() {
                       <h3 className="font-semibold text-gray-800 group-hover:text-[var(--nora-pink-dark)] transition-colors">
                         {module.title}
                       </h3>
+                      <ModuleStatusBadge isPublished={module.is_published} />
                       {module.is_checkin && (
                         <span className="text-xs font-medium text-[var(--nora-pink-dark)] bg-[var(--nora-pink-light)] px-2 py-0.5 rounded-full">
                           Check-In{module.checkin_typ === 'start' ? ' · Start' : module.checkin_typ === 'laufend' ? ' · laufend' : module.checkin_typ === 'ende' ? ' · Abschluss' : ''}
@@ -343,7 +350,7 @@ export default function AdminCourseDetail() {
                       )}
                       {hasHidden && (
                         <span className="text-xs font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full" title="Enthält versteckte (noch nicht freigegebene) Lektionen">
-                          Entwurf · versteckt
+                          Lektion wartet auf Freigabe
                         </span>
                       )}
                     </div>
@@ -360,6 +367,7 @@ export default function AdminCourseDetail() {
                   </div>
                 </Link>
                 <div className="flex items-center gap-2 shrink-0 ml-4">
+                  <ModulePublishButton moduleId={module.id} title={module.title} isPublished={module.is_published} onChange={load} />
                   <UnlockDaysInput module={module} onSave={load} />
                   <Link
                     to={editTarget}

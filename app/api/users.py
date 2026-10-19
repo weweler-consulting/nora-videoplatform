@@ -262,6 +262,8 @@ async def get_user_progress(user_id: str, admin: User = Depends(require_admin), 
         modules_progress = []
 
         for module in course.modules:
+            if not module.is_published:
+                continue  # Entwurf — für die Kundin (noch) nicht vorhanden
             mod_total = 0
             mod_completed = 0
             for section in module.sections:

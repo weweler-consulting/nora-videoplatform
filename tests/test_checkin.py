@@ -86,7 +86,7 @@ async def test_create_checkin_module_requires_admin(client, session):
     r = await client.post(
         "/api/v1/checkin/modules",
         headers=_auth(user),
-        json={"course_id": course.id, "template_typ": "start"},
+        json={"course_id": course.id, "template_typ": "start", "is_published": True},
     )
     assert r.status_code in (401, 403)
 
@@ -100,7 +100,7 @@ async def test_create_checkin_module_builds_module_section_lesson(client, sessio
     r = await client.post(
         "/api/v1/checkin/modules",
         headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1},
+        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1, "is_published": True},
     )
     assert r.status_code == 200, r.text
     body = r.json()
@@ -132,7 +132,7 @@ async def test_get_and_override_checkin_lesson(client, session):
     created = (await client.post(
         "/api/v1/checkin/modules",
         headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1},
+        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1, "is_published": True},
     )).json()
     lesson_id = created["lesson_id"]
 
@@ -185,7 +185,7 @@ async def test_module_reorder_persists(client, session):
     vid = (await client.post("/api/v1/modules/", headers=_auth(admin),
                              json={"course_id": course.id, "title": "Live Call", "sort_order": 0})).json()
     chk = (await client.post("/api/v1/checkin/modules", headers=_auth(admin),
-                             json={"course_id": course.id, "template_typ": "start"})).json()
+                             json={"course_id": course.id, "template_typ": "start", "is_published": True})).json()
 
     # tauschen: Check-in nach vorne
     await client.put(f"/api/v1/modules/{chk['module_id']}", headers=_auth(admin), json={"sort_order": 0})
@@ -209,7 +209,7 @@ async def test_submit_checkin_marks_complete_and_persists(client, session):
     course = await _mk_course(session)
     created = (await client.post(
         "/api/v1/checkin/modules", headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1},
+        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1, "is_published": True},
     )).json()
     lesson_id = created["lesson_id"]
 
@@ -262,7 +262,7 @@ async def test_submit_requires_enrollment(client, session):
     course = await _mk_course(session)
     created = (await client.post(
         "/api/v1/checkin/modules", headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "start"},
+        json={"course_id": course.id, "template_typ": "start", "is_published": True},
     )).json()
     lesson_id = created["lesson_id"]
 
@@ -283,7 +283,7 @@ async def test_edit_resubmit_updates_and_resets_sync(client, session):
     course = await _mk_course(session)
     created = (await client.post(
         "/api/v1/checkin/modules", headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "laufend", "week_index": 2},
+        json={"course_id": course.id, "template_typ": "laufend", "week_index": 2, "is_published": True},
     )).json()
     lesson_id = created["lesson_id"]
     klientin = await _mk_user(session, admin=False)
@@ -313,7 +313,7 @@ async def test_submit_enqueues_crm_outbox(client, session):
     course = await _mk_course(session)
     created = (await client.post(
         "/api/v1/checkin/modules", headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1},
+        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1, "is_published": True},
     )).json()
     lesson_id = created["lesson_id"]
     klientin = await _mk_user(session, admin=False)
@@ -352,7 +352,7 @@ async def test_crm_sync_processes_outbox(client, session, monkeypatch):
     course = await _mk_course(session)
     created = (await client.post(
         "/api/v1/checkin/modules", headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "start"},
+        json={"course_id": course.id, "template_typ": "start", "is_published": True},
     )).json()
     lesson_id = created["lesson_id"]
     klientin = await _mk_user(session, admin=False)
@@ -395,7 +395,7 @@ async def test_crm_sync_retries_on_failure(client, session, monkeypatch):
     course = await _mk_course(session)
     created = (await client.post(
         "/api/v1/checkin/modules", headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "start"},
+        json={"course_id": course.id, "template_typ": "start", "is_published": True},
     )).json()
     klientin = await _mk_user(session, admin=False)
     await _enroll(session, klientin.id, course.id)
@@ -426,7 +426,7 @@ async def test_create_checkin_module_sort_order_is_max_plus_one(client, session)
 
     created = (await client.post(
         "/api/v1/checkin/modules", headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "start"},
+        json={"course_id": course.id, "template_typ": "start", "is_published": True},
     )).json()
     mod = (await session.execute(_select(Module).where(Module.id == created["module_id"]))).scalar_one()
     assert mod.sort_order == 6
@@ -440,7 +440,7 @@ async def test_get_checkin_lesson_requires_enrollment(client, session):
     course = await _mk_course(session)
     created = (await client.post(
         "/api/v1/checkin/modules", headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "start"},
+        json={"course_id": course.id, "template_typ": "start", "is_published": True},
     )).json()
     lesson_id = created["lesson_id"]
 
@@ -461,7 +461,7 @@ async def test_submit_rejects_unknown_keys_and_oversized(client, session):
     course = await _mk_course(session)
     created = (await client.post(
         "/api/v1/checkin/modules", headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1},
+        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1, "is_published": True},
     )).json()
     lesson_id = created["lesson_id"]
     klientin = await _mk_user(session, admin=False)
@@ -489,7 +489,7 @@ async def test_submit_orphaned_lesson_returns_409(client, session):
     course = await _mk_course(session)
     created = (await client.post(
         "/api/v1/checkin/modules", headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "start"},
+        json={"course_id": course.id, "template_typ": "start", "is_published": True},
     )).json()
     await session.execute(delete(Module).where(Module.id == created["module_id"]))
     await session.commit()
@@ -516,7 +516,7 @@ async def test_crm_sync_accepts_204(client, session, monkeypatch):
     admin = await _mk_user(session, admin=True)
     course = await _mk_course(session)
     created = (await client.post("/api/v1/checkin/modules", headers=_auth(admin),
-                                 json={"course_id": course.id, "template_typ": "start"})).json()
+                                 json={"course_id": course.id, "template_typ": "start", "is_published": True})).json()
     klientin = await _mk_user(session, admin=False)
     await _enroll(session, klientin.id, course.id)
     await client.post(f"/api/v1/checkin/lessons/{created['lesson_id']}/submit", headers=_auth(klientin),
@@ -544,7 +544,7 @@ async def test_crm_sync_parks_after_max_retries(client, session, monkeypatch):
     admin = await _mk_user(session, admin=True)
     course = await _mk_course(session)
     created = (await client.post("/api/v1/checkin/modules", headers=_auth(admin),
-                                 json={"course_id": course.id, "template_typ": "start"})).json()
+                                 json={"course_id": course.id, "template_typ": "start", "is_published": True})).json()
     klientin = await _mk_user(session, admin=False)
     await _enroll(session, klientin.id, course.id)
     await client.post(f"/api/v1/checkin/lessons/{created['lesson_id']}/submit", headers=_auth(klientin),
@@ -573,7 +573,7 @@ async def test_submit_includes_ordered_questions_in_outbox(client, session):
     course = await _mk_course(session)
     created = (await client.post(
         "/api/v1/checkin/modules", headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1},
+        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1, "is_published": True},
     )).json()
     lesson_id = created["lesson_id"]
     await client.put(f"/api/v1/checkin/lessons/{lesson_id}", headers=_auth(admin),
@@ -611,7 +611,7 @@ async def test_submit_ende_checkin_mirrors_start_and_captures_upsell(client, ses
     course = await _mk_course(session)
     created = (await client.post(
         "/api/v1/checkin/modules", headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "ende"},
+        json={"course_id": course.id, "template_typ": "ende", "is_published": True},
     )).json()
     lesson_id = created["lesson_id"]
 
@@ -693,7 +693,7 @@ async def test_migrate_laufend_heisshunger_key_renames_everywhere(client, sessio
     course = await _mk_course(session)
     created = (await client.post(
         "/api/v1/checkin/modules", headers=_auth(admin),
-        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1},
+        json={"course_id": course.id, "template_typ": "laufend", "week_index": 1, "is_published": True},
     )).json()
     lesson_id = created["lesson_id"]
     klientin = await _mk_user(session, admin=False)

@@ -43,7 +43,7 @@ async def _checkin_typ_map(db: AsyncSession, course: Course) -> dict[str, str]:
     return {row[0]: row[1] for row in result.all()}
 
 
-def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: datetime | None = None, unlocked_module_ids: set[str] | None = None, checkin_typ_by_template_id: dict[str, str] | None = None, include_hidden: bool = False) -> CourseOut:
+def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: datetime | None = None, unlocked_module_ids: set[str] | None = None, checkin_typ_by_template_id: dict[str, str] | None = None, include_hidden: bool = False, include_drafts: bool = False) -> CourseOut:
     checkin_typ_by_template_id = checkin_typ_by_template_id or {}
     modules_out = []
     total_lessons = 0
@@ -51,6 +51,8 @@ def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: date
     now = utc_now()
 
     for module in course.modules:
+        if not include_drafts and not module.is_published:
+            continue  # Entwurf — Kunden sehen nur live geschaltete Module
         # Drip content: check if module is locked
         is_locked = False
         unlocks_at = None
@@ -100,6 +102,7 @@ def _build_course_out(course: Course, completed_ids: set[str], enrolled_at: date
             id=module.id, title=module.title, description=module.description,
             image_url=module.image_url, sort_order=module.sort_order,
             unlock_after_days=module.unlock_after_days,
+            is_published=module.is_published,
             is_locked=is_locked, unlocks_at=unlocks_at,
             sections=sections_out, total_lessons=mod_lessons,
             completed_lessons=mod_completed, total_duration=mod_duration,
@@ -141,8 +144,13 @@ async def list_my_courses(user: User = Depends(get_current_user), db: AsyncSessi
 
     items = []
     for course in courses:
-        total = sum(len(s.lessons) for m in course.modules for s in m.sections)
-        done = sum(1 for m in course.modules for s in m.sections for l in s.lessons if l.id in completed_ids)
+        # Nur was die Kundin sieht zählt: live Module, freigegebene Lektionen.
+        visible_ids = [
+            l.id for m in course.modules if m.is_published
+            for s in m.sections for l in s.lessons if l.is_published
+        ]
+        total = len(visible_ids)
+        done = sum(1 for lid in visible_ids if lid in completed_ids)
         items.append(CourseListItem(
             id=course.id, title=course.title, description=course.description,
             image_url=course.image_url, total_lessons=total, completed_lessons=done,
@@ -174,9 +182,9 @@ async def get_course(course_id: str, user: User = Depends(get_current_user), db:
 
     completed_ids = await _get_user_progress(db, user.id)
     checkin_map = await _checkin_typ_map(db, course)
-    # Admin sees everything unlocked
+    # Admin sees everything unlocked, inkl. Entwürfe (Vorschau)
     if user.is_admin:
-        return _build_course_out(course, completed_ids, checkin_typ_by_template_id=checkin_map)
+        return _build_course_out(course, completed_ids, checkin_typ_by_template_id=checkin_map, include_drafts=True)
 
     # Load manual unlocks for this user
     unlocks_result = await db.execute(
@@ -253,4 +261,4 @@ async def admin_get_course(course_id: str, admin: User = Depends(require_admin),
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
     checkin_map = await _checkin_typ_map(db, course)
-    return _build_course_out(course, set(), checkin_typ_by_template_id=checkin_map, include_hidden=True)
+    return _build_course_out(course, set(), checkin_typ_by_template_id=checkin_map, include_hidden=True, include_drafts=True)

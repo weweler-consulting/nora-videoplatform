@@ -113,7 +113,7 @@ async def create_checkin_module(
     )).scalar()
     sort_order = (max_so + 1) if max_so is not None else 0
 
-    module = Module(course_id=course.id, title=title, sort_order=sort_order)
+    module = Module(course_id=course.id, title=title, sort_order=sort_order, is_published=data.is_published)
     db.add(module)
     await db.flush()
     section = Section(module_id=module.id, title="Check-In", sort_order=0)

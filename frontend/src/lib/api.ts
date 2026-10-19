@@ -459,6 +459,7 @@ export interface ModuleItem {
   image_url: string | null;
   sort_order: number;
   unlock_after_days: number;
+  is_published: boolean;
   is_locked: boolean;
   unlocks_at: string | null;
   sections: SectionItem[];

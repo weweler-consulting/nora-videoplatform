@@ -52,6 +52,7 @@ class ModuleOut(BaseModel):
     image_url: Optional[str]
     sort_order: int
     unlock_after_days: int = 0
+    is_published: bool = True  # False = Entwurf, für Kunden unsichtbar
     is_locked: bool = False
     unlocks_at: Optional[str] = None
     sections: list[SectionOut] = []
@@ -100,6 +101,8 @@ class ModuleCreate(BaseModel):
     image_url: Optional[str] = None
     unlock_after_days: int = 0
     sort_order: int = 0
+    # Neue Module starten als Entwurf — Nora baut in Ruhe und schaltet dann live.
+    is_published: bool = False
 
 
 class ModuleUpdate(BaseModel):
@@ -108,6 +111,7 @@ class ModuleUpdate(BaseModel):
     image_url: Optional[str] = None
     unlock_after_days: Optional[int] = None
     sort_order: Optional[int] = None
+    is_published: Optional[bool] = None
 
 
 class SectionCreate(BaseModel):
