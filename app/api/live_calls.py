@@ -169,7 +169,7 @@ async def _approve(db, imp: LiveCallImport) -> None:
         .where(Module.id == select(Section.module_id).where(Section.id == lesson.section_id).scalar_subquery())
         .values(is_published=True)
     )
-    datum =imp.occurrence_at.strftime("%d.%m.%Y") if imp.occurrence_at else ""
+    datum = imp.occurrence_at.strftime("%d.%m.%Y") if imp.occurrence_at else ""
     subject = f"Die Aufzeichnung vom {datum} ist da 💛"
     body = ("Hallo,\n\ndie Aufzeichnung unseres letzten Live-Calls ist jetzt für dich im Kurs verfügbar. "
             "Schau sie dir in Ruhe an – und nutze, was für dich passt.\n\nViel Freude damit!")

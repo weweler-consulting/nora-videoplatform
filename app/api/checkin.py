@@ -156,6 +156,7 @@ async def get_checkin_lesson(
         lesson_id=lesson.id,
         module_id=module.id if module else "",
         course_id=module.course_id if module else "",
+        module_is_published=module.is_published if module else False,
         title=lesson.title,
         template_id=template.id,
         template_typ=template.typ,

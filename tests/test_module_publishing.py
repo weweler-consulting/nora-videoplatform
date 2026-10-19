@@ -125,3 +125,15 @@ async def test_live_call_approval_publishes_draft_module(client, session, monkey
 
     session.expunge_all()
     assert (await session.execute(select(Module).where(Module.id == module.id))).scalar_one().is_published is True
+
+
+@pytest.mark.asyncio
+async def test_checkin_editor_shows_module_status(client, session):
+    from app.core.checkin_seed import seed_checkin_templates
+    await seed_checkin_templates()
+    admin = await _mk_user(session, admin=True)
+    course = Course(title="K", is_active=True); session.add(course); await session.commit()
+    created = (await client.post("/api/v1/checkin/modules", headers=_auth(admin),
+                                 json={"course_id": course.id, "template_typ": "start"})).json()
+    r = await client.get(f"/api/v1/checkin/lessons/{created['lesson_id']}", headers=_auth(admin))
+    assert r.json()["module_is_published"] is False

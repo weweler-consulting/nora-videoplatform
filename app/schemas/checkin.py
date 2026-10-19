@@ -27,6 +27,7 @@ class CheckinLessonOut(BaseModel):
     lesson_id: str
     module_id: str
     course_id: str
+    module_is_published: bool = True
     title: str
     template_id: str
     template_typ: str

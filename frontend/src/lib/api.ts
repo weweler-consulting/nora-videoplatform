@@ -497,6 +497,7 @@ export interface CheckinLesson {
   lesson_id: string;
   module_id: string;
   course_id: string;
+  module_is_published: boolean;
   title: string;
   template_id: string;
   template_typ: 'start' | 'laufend' | 'ende';

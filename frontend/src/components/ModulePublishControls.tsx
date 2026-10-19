@@ -39,6 +39,8 @@ export function ModulePublishButton({
     try {
       await api.updateModule(moduleId, { is_published: !isPublished });
       onChange();
+    } catch (e) {
+      alert(`Umschalten fehlgeschlagen: ${e instanceof Error ? e.message : 'unbekannter Fehler'}`);
     } finally {
       setSaving(false);
     }
