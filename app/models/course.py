@@ -37,6 +37,9 @@ class Module(Base):
     image_url: Mapped[str] = mapped_column(String, nullable=True)
     unlock_after_days: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    # Entwurf (False) = nur Admins sehen das Modul. Bestehende Module bleiben live
+    # (Default True); neue Module aus dem Admin starten als Entwurf (siehe ModuleCreate).
+    is_published: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     course = relationship("Course", back_populates="modules")

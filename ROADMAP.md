@@ -22,6 +22,7 @@
 - Klickbare Navigation zurück zur Kursübersicht aus der Lektionsansicht
 - E-Mail bei Modul-Freischaltung (Drip-Benachrichtigung)
 - Einloggen aus Kundensicht (Impersonation zum Debuggen von Zugriffs-/Video-Problemen)
+- Module als Entwurf vorbereiten und per Klick live schalten (neue Module starten als Entwurf)
 
 ## Offene Features — sortiert nach Business Impact + Aufwand
 

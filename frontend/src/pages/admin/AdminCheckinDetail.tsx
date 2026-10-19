@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ClipboardList, ArrowLeft } from 'lucide-react';
 import { api, type CheckinLesson, type CheckinStep } from '../../lib/api';
+import { ModuleStatusBadge, ModulePublishButton } from '../../components/ModulePublishControls';
 
 const TYP_LABEL: Record<string, string> = {
   intro: 'Intro',
@@ -111,6 +112,11 @@ export default function AdminCheckinDetail() {
           <span className="text-xs font-medium text-[var(--nora-pink-dark)] bg-[var(--nora-pink-light)] px-2 py-0.5 rounded-full">
             {lesson.template_typ === 'start' ? 'Bestandsaufnahme' : lesson.template_typ === 'laufend' ? 'Wöchentlicher Check-in' : 'Abschluss'}
           </span>
+        </div>
+        <ModuleStatusBadge isPublished={lesson.module_is_published} />
+        <div className="ml-auto">
+          <ModulePublishButton moduleId={lesson.module_id} title={lesson.title} isPublished={lesson.module_is_published}
+            onChange={() => setLesson({ ...lesson, module_is_published: !lesson.module_is_published })} />
         </div>
       </div>
 

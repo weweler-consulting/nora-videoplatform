@@ -27,6 +27,7 @@ class CheckinLessonOut(BaseModel):
     lesson_id: str
     module_id: str
     course_id: str
+    module_is_published: bool = True
     title: str
     template_id: str
     template_typ: str
@@ -40,6 +41,7 @@ class CheckinModuleCreate(BaseModel):
     template_typ: str  # 'start' | 'laufend' | 'ende'
     title: Optional[str] = None
     week_index: Optional[int] = None
+    is_published: bool = False  # wie ModuleCreate: neu = Entwurf
 
 
 class StepOverride(BaseModel):

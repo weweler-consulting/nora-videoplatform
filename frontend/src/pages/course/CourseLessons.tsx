@@ -44,7 +44,14 @@ function ModuleCard({
           <div className="w-16 h-12 md:w-20 md:h-14 bg-gradient-to-br from-[var(--nora-pink-light)] to-[var(--nora-pink)] rounded-lg shrink-0" />
         )}
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-800">{module.title}</h3>
+          <h3 className="font-semibold text-gray-800">
+            {module.title}
+            {!module.is_published && (
+              <span className="ml-2 align-middle text-xs font-medium text-gray-600 bg-gray-200 px-2 py-0.5 rounded-full">
+                Entwurf · nur für dich sichtbar
+              </span>
+            )}
+          </h3>
           <p className="text-sm text-gray-500">
             {module.is_locked
               ? `Verfügbar ab ${module.unlocks_at}`

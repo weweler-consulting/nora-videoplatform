@@ -459,6 +459,7 @@ export interface ModuleItem {
   image_url: string | null;
   sort_order: number;
   unlock_after_days: number;
+  is_published: boolean;
   is_locked: boolean;
   unlocks_at: string | null;
   sections: SectionItem[];
@@ -496,6 +497,7 @@ export interface CheckinLesson {
   lesson_id: string;
   module_id: string;
   course_id: string;
+  module_is_published: boolean;
   title: string;
   template_id: string;
   template_typ: 'start' | 'laufend' | 'ende';

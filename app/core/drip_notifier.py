@@ -37,7 +37,7 @@ async def check_drip_notifications(base_url: str = "https://kurse.noraweweler.de
             # Get modules with drip for this course
             modules_result = await db.execute(
                 select(Module)
-                .where(Module.course_id == course.id, Module.unlock_after_days > 0)
+                .where(Module.course_id == course.id, Module.unlock_after_days > 0, Module.is_published == True)
                 .order_by(Module.sort_order)
             )
             modules = modules_result.scalars().all()

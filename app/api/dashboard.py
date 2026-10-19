@@ -59,7 +59,7 @@ async def dashboard_stats(admin: User = Depends(require_admin), db: AsyncSession
             .select_from(Lesson)
             .join(Section, Lesson.section_id == Section.id)
             .join(Module, Section.module_id == Module.id)
-            .where(Module.course_id == course.id)
+            .where(Module.course_id == course.id, Module.is_published == True)
         )
         total_lessons = lesson_count_q.scalar() or 0
 
@@ -85,7 +85,7 @@ async def dashboard_stats(admin: User = Depends(require_admin), db: AsyncSession
             select(Lesson.id)
             .join(Section, Lesson.section_id == Section.id)
             .join(Module, Section.module_id == Module.id)
-            .where(Module.course_id == course.id)
+            .where(Module.course_id == course.id, Module.is_published == True)
         )
         lesson_ids = set(lesson_ids_q.scalars().all())
 
@@ -174,6 +174,7 @@ async def dashboard_stats(admin: User = Depends(require_admin), db: AsyncSession
                     Enrollment.course_id == Course.id,
                     Enrollment.user_id == u.id,
                 ))
+                .where(Module.is_published == True)
             )
             user_total_lessons = user_lessons_q.scalar() or 0
 

@@ -59,7 +59,8 @@ async def resolve_target_section(db, course_id: str, occurrence_at: datetime) ->
     next_order = ((await db.execute(
         select(func.max(Module.sort_order)).where(Module.course_id == course_id)
     )).scalar() or 0) + 1
-    module = Module(course_id=course_id, title=f"Live Call {occurrence_at.strftime('%d.%m.%Y')}", sort_order=next_order)
+    # Entwurf bis zur Freigabe — _approve schaltet Modul + Lektion gemeinsam live.
+    module = Module(course_id=course_id, title=f"Live Call {occurrence_at.strftime('%d.%m.%Y')}", sort_order=next_order, is_published=False)
     db.add(module)
     await db.flush()
     section_id = await _ensure_section(db, module.id)

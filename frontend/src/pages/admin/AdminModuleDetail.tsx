@@ -10,6 +10,7 @@ import {
   type AnnouncementTargetType,
 } from '../../lib/api';
 import AnnouncementComposeModal from '../../components/AnnouncementComposeModal';
+import { ModuleStatusBadge, ModulePublishButton } from '../../components/ModulePublishControls';
 
 export default function AdminModuleDetail() {
   const { courseId, moduleId } = useParams<{ courseId: string; moduleId: string }>();
@@ -152,14 +153,17 @@ export default function AdminModuleDetail() {
       </div>
 
       <div className="flex items-center justify-between mb-6 gap-4">
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex items-center gap-3">
           <EditableModuleTitle moduleId={module.id} value={module.title} onSaved={load} />
+          <ModuleStatusBadge isPublished={module.is_published} />
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <ModulePublishButton moduleId={module.id} title={module.title} isPublished={module.is_published} onChange={load} />
           <button
             onClick={() => setAnnounceTarget({ type: 'module', id: module.id })}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-[var(--nora-pink-dark)] transition-colors"
-            title="Klientinnen über dieses Modul informieren"
+            disabled={!module.is_published}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-[var(--nora-pink-dark)] transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            title={module.is_published ? 'Klientinnen über dieses Modul informieren' : 'Erst live schalten, dann ankündigen'}
           >
             <Megaphone size={14} />
             Ankündigen
